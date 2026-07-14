@@ -22,6 +22,7 @@ import ipaddress
 import urllib.parse
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import anthropic
 
@@ -36,6 +37,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Screenshots: the runner writes PNGs here; we expose them read-only at /shots so
+# the frontend can display them. Ensure the dir exists before mounting.
+SHOTS_DIR = os.environ.get("SHOTS_DIR", "./shots")
+os.makedirs(SHOTS_DIR, exist_ok=True)
+app.mount("/shots", StaticFiles(directory=SHOTS_DIR), name="shots")
 
 SUPPORTED_CHECKS = ["page_load", "title", "https", "login_present", "performance"]
 
@@ -125,8 +132,14 @@ def run(req: RunRequest):
     checks = [c for c in req.checks if c in SUPPORTED_CHECKS]
     if not checks:
         raise HTTPException(400, "No valid checks requested.")
-    shots_dir = os.environ.get("SHOTS_DIR", "./shots")
-    result = run_test(req.url, checks=checks, shots_dir=shots_dir)
+    result = run_test(req.url, checks=checks, shots_dir=SHOTS_DIR)
+
+    # Expose each captured screenshot as a servable URL. We add this AFTER the
+    # runner has hashed the trace, so the auditable hash stays over the raw steps.
+    for s in result.get("steps", []):
+        shot_path = s.get("shot")
+        if shot_path:
+            s["shot_url"] = "/shots/" + os.path.basename(shot_path)
     return result
 
 

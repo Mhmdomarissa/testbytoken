@@ -198,8 +198,16 @@ function renderProof(r){
       <div class="ms">${s.ms} ms</div>
     </div>`).join("");
 
-  // Screenshot: the backend should expose shots via a static route, or return base64.
-  // For the demo, if the backend serves /shots/, wire it here. Left as a TODO marker.
+  // Screenshot: backend exposes shots at /shots/<file>; each step carries a shot_url.
+  const shotStep = r.steps.find(s => s.shot_url);
+  const shot = document.getElementById("shot");
+  if (shotStep) {
+    shot.src = API + shotStep.shot_url;
+    shot.classList.remove("hidden");
+  } else {
+    shot.classList.add("hidden");
+  }
+
   document.getElementById("hashbox").classList.remove("hidden");
   document.getElementById("hash").textContent = r.trace_sha256;
 }
