@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(unzip -l \"chat transfer.zip\")",
+      "Bash(unzip -o \"chat transfer.zip\" -d extracted)",
+      "Bash(unzip -o \"taas-demo.zip\" -d taas-demo)"
+    ]
+  }
+}

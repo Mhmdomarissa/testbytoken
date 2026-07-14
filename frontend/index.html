@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Proof — deterministic web testing</title>
+<style>
+  :root{
+    --ink:#0f1b2d; --ink-soft:#5a6b80; --line:#e4e8ee; --bg:#f7f9fc;
+    --card:#ffffff; --accent:#1d5fa5; --accent-soft:#e8f1fb;
+    --pass:#0f6e56; --pass-bg:#e1f5ee; --fail:#a32d2d; --fail-bg:#fcebeb;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    color:var(--ink);background:var(--bg);line-height:1.5}
+  .wrap{max-width:760px;margin:0 auto;padding:48px 20px 80px}
+  .eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);
+    font-weight:600;margin-bottom:12px}
+  h1{font-size:34px;line-height:1.15;margin:0 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--ink-soft);margin:0 0 32px;max-width:48ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;margin-bottom:20px}
+  label{display:block;font-size:13px;font-weight:600;margin-bottom:8px;color:var(--ink)}
+  input[type=url],input[type=text]{width:100%;padding:12px 14px;border:1px solid var(--line);
+    border-radius:10px;font-size:15px;outline:none}
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .picks{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .pick{padding:9px 16px;border:1px solid var(--line);border-radius:999px;background:#fff;
+    font-size:14px;cursor:pointer;transition:.15s}
+  .pick:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .pick.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .row{display:flex;gap:10px;margin-top:16px}
+  .btn{padding:12px 22px;border:none;border-radius:10px;background:var(--accent);color:#fff;
+    font-size:15px;font-weight:600;cursor:pointer}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
+  .hint{font-size:13px;color:var(--ink-soft);margin-top:10px}
+  .lock{display:flex;gap:8px;align-items:center;background:var(--accent-soft);border-radius:10px;
+    padding:10px 14px;font-size:13px;color:var(--accent);margin-top:16px}
+  /* run + proof */
+  .verdict{display:flex;align-items:center;justify-content:space-between;border-radius:10px;
+    padding:14px 18px;margin-bottom:18px;font-weight:600}
+  .verdict.pass{background:var(--pass-bg);color:var(--pass)}
+  .verdict.partial{background:var(--fail-bg);color:var(--fail)}
+  .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+  .meta div{background:var(--bg);border-radius:8px;padding:10px 12px}
+  .meta .k{font-size:11px;color:var(--ink-soft)}
+  .meta .v{font-size:13px;font-weight:600;word-break:break-all}
+  .step{display:flex;gap:10px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
+  .step:first-child{border-top:none}
+  .dot{width:18px;height:18px;border-radius:50%;flex:none;display:flex;align-items:center;
+    justify-content:center;font-size:11px;color:#fff;font-weight:700}
+  .dot.pass{background:var(--pass)} .dot.fail{background:var(--fail)} .dot.run{background:var(--ink-soft)}
+  .step .name{font-size:14px;font-weight:600;flex:1}
+  .step .detail{font-size:12px;color:var(--ink-soft)}
+  .step .ms{font-size:11px;color:var(--ink-soft)}
+  .shot{width:100%;border-radius:10px;border:1px solid var(--line);margin-top:16px}
+  .hash{display:flex;gap:8px;align-items:flex-start;background:var(--bg);border-radius:8px;
+    padding:10px 12px;margin-top:16px;font-size:11px}
+  .hash .h{font-family:var(--mono);word-break:break-all}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">Deterministic · auditable</div>
+  <h1>See a real browser test your site — and prove it.</h1>
+  <p class="sub">Not a chatbot guessing. A real browser actually runs the steps, and hands you a signed, timestamped record you can keep.</p>
+
+  <!-- STEP 1+2: land + describe -->
+  <div class="card" id="setup">
+    <label for="url">1 · Paste a URL to test</label>
+    <input type="url" id="url" placeholder="https://your-site.com" value="https://alphacv.alphadatarecruitment.ae/" />
+
+    <label style="margin-top:22px">2 · What would you like to test?</label>
+    <input type="text" id="desc" placeholder="e.g. check the page loads and the login screen appears" />
+    <div class="picks" id="picks">
+      <div class="pick" data-pick="page_load">Page load</div>
+      <div class="pick" data-pick="user_login">User login</div>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="runBtn">Run test</button>
+    </div>
+    <div class="lock">
+      <span>🔒</span>
+      <span>Testing behind a login? That unlocks after sign-up, with credentials stored in a secure vault — never typed here.</span>
+    </div>
+  </div>
+
+  <!-- STEP 3+4: run + proof -->
+  <div class="card hidden" id="report">
+    <div class="verdict" id="verdict"></div>
+    <div class="meta" id="meta"></div>
+    <div id="steps"></div>
+    <img class="shot hidden" id="shot" alt="Screenshot captured during the test" />
+    <div class="hash hidden" id="hashbox">
+      <span>🛡️</span>
+      <div><div style="color:var(--ink-soft)">SHA-256 trace hash (tamper-evident)</div>
+      <div class="h" id="hash"></div></div>
+    </div>
+    <div class="row" style="margin-top:20px">
+      <button class="btn ghost" id="againBtn">Run another</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Point this at your backend. Default assumes local dev.
+const API = window.API_BASE || "http://localhost:8000";
+
+let activePick = null;
+const picks = document.getElementById("picks");
+picks.addEventListener("click", e => {
+  const el = e.target.closest(".pick");
+  if (!el) return;
+  document.querySelectorAll(".pick").forEach(p => p.classList.remove("active"));
+  el.classList.add("active");
+  activePick = el.dataset.pick;
+  document.getElementById("desc").value = "";
+});
+document.getElementById("desc").addEventListener("input", () => {
+  document.querySelectorAll(".pick").forEach(p => p.classList.remove("active"));
+  activePick = null;
+});
+
+const runBtn = document.getElementById("runBtn");
+runBtn.addEventListener("click", runFlow);
+document.getElementById("againBtn").addEventListener("click", () => {
+  document.getElementById("report").classList.add("hidden");
+  document.getElementById("setup").classList.remove("hidden");
+});
+
+async function runFlow(){
+  const url = document.getElementById("url").value.trim();
+  const desc = document.getElementById("desc").value.trim();
+  if (!url) { alert("Add a URL first."); return; }
+  if (!activePick && !desc) { alert("Pick an option or describe what to test."); return; }
+
+  runBtn.disabled = true; runBtn.textContent = "Planning…";
+  try {
+    // STEP 2: plan -> check ids
+    const planRes = await fetch(API + "/plan", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ url, description: desc || null, quick_pick: activePick })
+    });
+    if(!planRes.ok) throw new Error((await planRes.json()).detail || "Planning failed");
+    const { checks } = await planRes.json();
+
+    // STEP 3: run (this is the real browser doing work)
+    runBtn.textContent = "Running real browser…";
+    showRunning(checks);
+    const runRes = await fetch(API + "/run", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ url, checks })
+    });
+    if(!runRes.ok) throw new Error((await runRes.json()).detail || "Run failed");
+    const result = await runRes.json();
+
+    // STEP 4: proof
+    renderProof(result);
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    runBtn.disabled = false; runBtn.textContent = "Run test";
+  }
+}
+
+function showRunning(checks){
+  document.getElementById("setup").classList.add("hidden");
+  document.getElementById("report").classList.remove("hidden");
+  document.getElementById("verdict").className = "verdict partial";
+  document.getElementById("verdict").innerHTML = "<span>Running…</span><span>real browser</span>";
+  document.getElementById("meta").innerHTML = "";
+  document.getElementById("steps").innerHTML = checks.map(c =>
+    `<div class="step"><div class="dot run">•</div><div class="name">${c}</div></div>`).join("");
+  document.getElementById("shot").classList.add("hidden");
+  document.getElementById("hashbox").classList.add("hidden");
+}
+
+function renderProof(r){
+  const v = document.getElementById("verdict");
+  const pass = r.verdict === "PASS";
+  v.className = "verdict " + (pass ? "pass":"partial");
+  v.innerHTML = `<span>${r.verdict} · ${r.steps_passed}/${r.steps_total} steps</span><span>real browser · Chromium</span>`;
+
+  document.getElementById("meta").innerHTML = `
+    <div><div class="k">Target</div><div class="v">${r.target}</div></div>
+    <div><div class="k">Run ID</div><div class="v">${r.run_id}</div></div>
+    <div><div class="k">Compute</div><div class="v">${r.compute_ms} ms · ${r.test_tokens} tokens</div></div>`;
+
+  document.getElementById("steps").innerHTML = r.steps.map(s => `
+    <div class="step">
+      <div class="dot ${s.status}">${s.status==="pass"?"✓":"✕"}</div>
+      <div style="flex:1"><div class="name">${s.name}</div><div class="detail">${s.detail}</div></div>
+      <div class="ms">${s.ms} ms</div>
+    </div>`).join("");
+
+  // Screenshot: the backend should expose shots via a static route, or return base64.
+  // For the demo, if the backend serves /shots/, wire it here. Left as a TODO marker.
+  document.getElementById("hashbox").classList.remove("hidden");
+  document.getElementById("hash").textContent = r.trace_sha256;
+}
+</script>
+</body>
+</html>
