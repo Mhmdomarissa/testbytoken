@@ -69,6 +69,31 @@ need that now. The full architecture lives in the separate architecture doc the
 owner has. Build the demo so the engine (`runner.py`) stays swappable — the API
 shouldn't care what runs inside the container.
 
+**Planned engine direction (July 2026):** test execution will route to the
+**UTS Global Test Magic** system, either over an API link or as an instance we
+host in a container — that decision is not yet cemented. Until it is, treat the
+local Playwright engine as adapter #1 of a swappable engine layer, and do not
+deepen the API's direct coupling to `runner.py`.
+
+## Known issues & remediation plan — READ BEFORE BUILDING FURTHER
+
+A full code review (July 2026) produced [`bug_fixes.md`](bug_fixes.md): every
+known bug, security hole, and architecture change, each with detailed fix
+instructions, verification steps, and a flag for whether it depends on the UTS
+integration decision. Highlights:
+
+- **Critical bugs** (XSS from tested sites, run-ID collisions, bypassable
+  target guardrail, open endpoints with no rate limit) — documented with fixes,
+  **not yet applied**.
+- **Architecture items** (async job model, engine abstraction for the UTS
+  adapter, artifact storage, persistence + versioned result contract, signed
+  proofs) — designed but deliberately on hold until the UTS hosting model
+  (API vs. container) is decided.
+
+Implementation order and the UTS decision gate are spelled out at the top of
+that document. Anything marked **UTS-independent** may be implemented at any
+time; everything else waits.
+
 ## Tech choices (already made for you)
 
 - Backend: Python + FastAPI + Playwright. Keep it.
