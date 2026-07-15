@@ -3,7 +3,13 @@
     "allow": [
       "Bash(unzip -l \"chat transfer.zip\")",
       "Bash(unzip -o \"chat transfer.zip\" -d extracted)",
-      "Bash(unzip -o \"taas-demo.zip\" -d taas-demo)"
+      "Bash(unzip -o \"taas-demo.zip\" -d taas-demo)",
+      "PowerShell(python -c \"import fastapi, uvicorn, anthropic, playwright; print\\('deps ok'\\)\")",
+      "PowerShell(python -c \"import fastapi; import uvicorn; import playwright; print\\('core ok'\\)\")",
+      "PowerShell(pip install anthropic --quiet)",
+      "PowerShell(python -c \"import anthropic; print\\('anthropic ok'\\)\")",
+      "PowerShell(python \"C:\\\\Users\\\\HP\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-HP-Desktop-Test-by-Token\\\\241b9af7-697a-420b-894f-d6ea5c549fb0\\\\scratchpad\\\\shot_filetest.py\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8001/docs)"
     ]
   }
 }

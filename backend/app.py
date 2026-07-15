@@ -19,6 +19,8 @@ SECURITY GUARDRAILS (MVP — keep these, they are not optional):
 
 import os
 import ipaddress
+import pathlib
+import re
 import urllib.parse
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -64,8 +66,35 @@ class RunRequest(BaseModel):
     checks: list[str]
 
 
+# LOCAL DEMO MODE: when on (the default), target restrictions are lifted so you
+# can test anything from your own laptop — localhost, private IPs, even local
+# HTML files (C:\path\to\page.html). Set TAAS_LOCAL_DEMO=0 before ANY public
+# deployment; that re-enables is_allowed_target() and blocks file:// targets.
+LOCAL_DEMO = os.environ.get("TAAS_LOCAL_DEMO", "1") == "1"
+
+_WINDOWS_PATH = re.compile(r"^[a-zA-Z]:[\\/]")
+
+
+def normalize_target(url: str) -> str:
+    """Turn whatever the user pasted into something a browser can navigate to:
+    a Windows file path becomes a file:/// URL, a bare domain gets https://."""
+    url = url.strip().strip('"')
+    if _WINDOWS_PATH.match(url):
+        return pathlib.Path(url).as_uri()
+    if url.startswith("file://"):
+        return url
+    if "://" not in url:
+        return "https://" + url
+    return url
+
+
 def is_allowed_target(url: str) -> bool:
-    """Block private/internal hosts on the free tier. Crude but essential."""
+    """Block private/internal hosts on the free tier. Crude but essential.
+    Bypassed entirely in LOCAL_DEMO mode (single-laptop demo)."""
+    if LOCAL_DEMO:
+        return True
+    if url.startswith("file://"):
+        return False
     try:
         host = urllib.parse.urlparse(url).hostname or ""
     except Exception:
@@ -85,9 +114,18 @@ def is_allowed_target(url: str) -> bool:
     return True
 
 
+def drop_irrelevant_checks(checks: list[str], target: str) -> list[str]:
+    """An http:// or file:// target can never pass the HTTPS check — planning it
+    would just guarantee a failed step, so leave it out for those targets."""
+    if not target.startswith("https://"):
+        checks = [c for c in checks if c != "https"]
+    return checks
+
+
 @app.post("/plan")
 def plan(req: PlanRequest):
-    if not is_allowed_target(req.url):
+    target = normalize_target(req.url)
+    if not is_allowed_target(target):
         raise HTTPException(400, "That target isn't allowed on the free tier.")
 
     # Quick-pick path: instant, no LLM, no cost.
@@ -95,7 +133,7 @@ def plan(req: PlanRequest):
         checks = QUICK_PICKS.get(req.quick_pick)
         if not checks:
             raise HTTPException(400, f"Unknown quick pick: {req.quick_pick}")
-        return {"checks": checks, "source": "quick_pick"}
+        return {"checks": drop_irrelevant_checks(checks, target), "target": target, "source": "quick_pick"}
 
     # Free-text path: ask Claude to map the request to our supported checks.
     if not req.description:
@@ -122,17 +160,18 @@ def plan(req: PlanRequest):
         checks = [c for c in checks if c in SUPPORTED_CHECKS] or ["page_load", "title"]
     except Exception:
         checks = ["page_load", "title"]
-    return {"checks": checks, "source": "llm"}
+    return {"checks": drop_irrelevant_checks(checks, target), "target": target, "source": "llm"}
 
 
 @app.post("/run")
 def run(req: RunRequest):
-    if not is_allowed_target(req.url):
+    target = normalize_target(req.url)
+    if not is_allowed_target(target):
         raise HTTPException(400, "That target isn't allowed on the free tier.")
     checks = [c for c in req.checks if c in SUPPORTED_CHECKS]
     if not checks:
         raise HTTPException(400, "No valid checks requested.")
-    result = run_test(req.url, checks=checks, shots_dir=SHOTS_DIR)
+    result = run_test(target, checks=checks, shots_dir=SHOTS_DIR)
 
     # Expose each captured screenshot as a servable URL. We add this AFTER the
     # runner has hashed the trace, so the auditable hash stays over the raw steps.

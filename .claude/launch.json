@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "5500", "--directory", "frontend"],
       "port": 5500
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-Command", "cd backend; python -m uvicorn app:app --port 8000"],
+      "port": 8000
     }
   ]
 }

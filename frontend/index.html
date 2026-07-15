@@ -3,113 +3,471 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Proof — deterministic web testing</title>
+<title>Proof — Testing as a Service</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
 <style>
+  /* ─── Design tokens (per DESIGN_LANGUAGE.md) ─── */
   :root{
-    --ink:#0f1b2d; --ink-soft:#5a6b80; --line:#e4e8ee; --bg:#f7f9fc;
-    --card:#ffffff; --accent:#1d5fa5; --accent-soft:#e8f1fb;
-    --pass:#0f6e56; --pass-bg:#e1f5ee; --fail:#a32d2d; --fail-bg:#fcebeb;
+    --blue-deep:#0a1628;
+    --blue-mid:#0d2244;
+    --blue-light:#1a3a6b;
+    --blue-bright:#1e4d8c;
+    --gold:#c9a96e;
+    --warm-white:#f8f4ee;
+    --muted:#8a9ab5;
+    --footer-deep:#060e1b;
+    /* state colors derived from gold (hue-shifted, same lightness family — no new hues) */
+    --pass:#c9a96e;
+    --fail:#c97b6e;
+    --serif:'Cormorant Garamond',serif;
+    --sans:'Montserrat',sans-serif;
     --mono:ui-monospace,"SF Mono",Menlo,monospace;
   }
-  *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    color:var(--ink);background:var(--bg);line-height:1.5}
-  .wrap{max-width:760px;margin:0 auto;padding:48px 20px 80px}
-  .eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);
-    font-weight:600;margin-bottom:12px}
-  h1{font-size:34px;line-height:1.15;margin:0 0 12px;letter-spacing:-.02em}
-  .sub{font-size:17px;color:var(--ink-soft);margin:0 0 32px;max-width:48ch}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;margin-bottom:20px}
-  label{display:block;font-size:13px;font-weight:600;margin-bottom:8px;color:var(--ink)}
-  input[type=url],input[type=text]{width:100%;padding:12px 14px;border:1px solid var(--line);
-    border-radius:10px;font-size:15px;outline:none}
-  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-  .picks{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
-  .pick{padding:9px 16px;border:1px solid var(--line);border-radius:999px;background:#fff;
-    font-size:14px;cursor:pointer;transition:.15s}
-  .pick:hover{border-color:var(--accent);background:var(--accent-soft)}
-  .pick.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
-  .row{display:flex;gap:10px;margin-top:16px}
-  .btn{padding:12px 22px;border:none;border-radius:10px;background:var(--accent);color:#fff;
-    font-size:15px;font-weight:600;cursor:pointer}
-  .btn:disabled{opacity:.5;cursor:not-allowed}
-  .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
-  .hint{font-size:13px;color:var(--ink-soft);margin-top:10px}
-  .lock{display:flex;gap:8px;align-items:center;background:var(--accent-soft);border-radius:10px;
-    padding:10px 14px;font-size:13px;color:var(--accent);margin-top:16px}
-  /* run + proof */
-  .verdict{display:flex;align-items:center;justify-content:space-between;border-radius:10px;
-    padding:14px 18px;margin-bottom:18px;font-weight:600}
-  .verdict.pass{background:var(--pass-bg);color:var(--pass)}
-  .verdict.partial{background:var(--fail-bg);color:var(--fail)}
-  .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
-  .meta div{background:var(--bg);border-radius:8px;padding:10px 12px}
-  .meta .k{font-size:11px;color:var(--ink-soft)}
-  .meta .v{font-size:13px;font-weight:600;word-break:break-all}
-  .step{display:flex;gap:10px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;background:var(--blue-deep)}
+  body{font-family:var(--sans);color:var(--warm-white)}
+  img{display:block}
+  a{color:var(--gold)}
+  a:hover{color:#e0c495}
+  button{font-family:var(--sans);cursor:pointer}
+  /* radius 0 everywhere is deliberate — no border-radius in this file */
+
+  .container{max-width:1280px;margin:0 auto;padding:0 60px}
+  .eyebrow{display:flex;align-items:center;gap:16px}
+  .eyebrow .line{width:36px;height:1.5px;background:var(--gold)}
+  .eyebrow span{font-size:10px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;color:var(--gold)}
+  .divider{width:32px;height:1.5px;background:var(--gold)}
+
+  /* ─── Nav ─── */
+  nav{background:var(--blue-deep);border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;z-index:100}
+  .nav-inner{max-width:1280px;margin:0 auto;padding:0 60px;height:76px;display:flex;align-items:center;justify-content:space-between}
+  .wordmark{text-decoration:none;display:flex;flex-direction:column;line-height:1.1}
+  .wordmark .brand{font-weight:700;font-size:17px;letter-spacing:.2em;color:var(--gold);text-transform:uppercase}
+  .wordmark .sub{font-weight:300;font-size:9px;letter-spacing:.26em;color:var(--muted);text-transform:uppercase;margin-top:3px}
+  .nav-links{display:flex;gap:40px;list-style:none;align-items:center}
+  .nav-links a{font-size:11px;font-weight:500;letter-spacing:.15em;text-transform:uppercase;color:rgba(248,244,238,0.75);text-decoration:none}
+  .nav-links a:hover{color:var(--warm-white)}
+  .btn-ghost-gold{background:transparent;color:var(--gold);border:1.5px solid var(--gold);padding:11px 26px;font-size:11px;font-weight:600;letter-spacing:.15em;text-transform:uppercase}
+  .btn-ghost-gold:hover{background:rgba(201,169,110,0.1)}
+
+  /* ─── Hero ─── */
+  .hero{position:relative;height:700px;overflow:hidden}
+  .hero>img{width:100%;height:100%;object-fit:cover}
+  .hero .overlay{position:absolute;inset:0;background:linear-gradient(100deg,rgba(10,22,40,0.96) 38%,rgba(10,22,40,0.62) 70%,rgba(10,22,40,0.25) 100%)}
+  .hero-content{position:absolute;inset:0;z-index:2;max-width:1280px;margin:0 auto;padding:0 60px;display:grid;grid-template-columns:1.05fr .95fr;gap:64px;align-items:center}
+  .hero .eyebrow{margin-bottom:30px}
+  .hero .eyebrow .line{width:48px}
+  .hero .eyebrow span{font-size:11px;letter-spacing:.26em}
+  .hero h1{font-family:var(--serif);font-size:68px;font-weight:300;line-height:1.05;letter-spacing:-.02em;color:var(--warm-white);margin-bottom:30px}
+  .hero h1 em{font-style:italic;color:var(--gold)}
+  .hero .lede{font-size:15px;line-height:1.85;color:rgba(248,244,238,0.72);max-width:480px;font-weight:300}
+
+  /* Hero test launcher */
+  .launcher{background:rgba(10,22,40,0.9);border:1px solid rgba(255,255,255,0.12);padding:40px 40px 32px;backdrop-filter:blur(4px)}
+  .launcher .eyebrow{margin-bottom:28px}
+  .launcher label{display:block;font-size:10px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:rgba(248,244,238,0.55);margin-bottom:10px}
+  .launcher label b{color:var(--gold);font-weight:600}
+  .launcher input{width:100%;background:rgba(248,244,238,0.05);border:1px solid rgba(255,255,255,0.15);color:var(--warm-white);padding:13px 16px;font-size:14px;font-family:var(--sans);font-weight:300;outline:none}
+  .launcher input::placeholder{color:rgba(248,244,238,0.3)}
+  .launcher input:focus{border-color:var(--gold)}
+  .field{margin-bottom:22px}
+  .picks{display:flex;gap:10px;margin-top:10px}
+  .pick{flex:1;padding:10px 14px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:rgba(248,244,238,0.65);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;transition:all .2s;text-align:center}
+  .pick:hover{border-color:var(--gold);color:var(--gold)}
+  .pick.active{border-color:var(--gold);background:rgba(201,169,110,0.12);color:var(--gold)}
+  .btn-gold{width:100%;background:var(--gold);color:var(--blue-deep);border:none;padding:16px 44px;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;transition:background-color .2s}
+  .btn-gold:hover{background:#d9bc85}
+  .btn-gold:disabled{opacity:.5;cursor:not-allowed}
+  .launcher .lock{display:flex;gap:10px;align-items:flex-start;margin-top:18px;font-size:11px;line-height:1.7;color:rgba(248,244,238,0.4);font-weight:300}
+  .launcher .lock span:first-child{color:var(--gold)}
+  .launcher .error{margin-top:14px;font-size:12px;line-height:1.6;color:var(--fail);display:none}
+
+  /* ─── Report / proof section ─── */
+  #report-section{background:var(--blue-mid);border-top:1px solid rgba(255,255,255,0.05);padding:90px 60px;display:none}
+  .report-card{max-width:880px;margin:0 auto}
+  .report-card .eyebrow{justify-content:center;margin-bottom:22px}
+  .report-card h2{font-family:var(--serif);font-size:50px;font-weight:300;line-height:1.18;text-align:center;margin-bottom:48px}
+  .report-card h2 em{font-style:italic;color:var(--gold)}
+  .verdict{display:flex;align-items:center;justify-content:space-between;border:1px solid rgba(255,255,255,0.12);border-left:4px solid var(--gold);background:var(--blue-deep);padding:20px 26px;margin-bottom:2px}
+  .verdict .v-main{font-family:var(--serif);font-size:30px;font-weight:300;letter-spacing:-.01em;color:var(--pass)}
+  .verdict.fail .v-main{color:var(--fail)}
+  .verdict.fail{border-left-color:var(--fail)}
+  .verdict .v-side{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:rgba(248,244,238,0.55)}
+  .meta{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-bottom:2px}
+  .meta>div{background:var(--blue-deep);padding:16px 20px}
+  .meta .k{font-size:9px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:rgba(248,244,238,0.4);margin-bottom:6px}
+  .meta .v{font-size:13px;font-weight:500;color:var(--warm-white);word-break:break-all}
+  .steps{background:var(--blue-deep);padding:8px 26px}
+  .step{display:flex;gap:16px;align-items:center;padding:14px 0;border-top:1px solid rgba(255,255,255,0.07)}
   .step:first-child{border-top:none}
-  .dot{width:18px;height:18px;border-radius:50%;flex:none;display:flex;align-items:center;
-    justify-content:center;font-size:11px;color:#fff;font-weight:700}
-  .dot.pass{background:var(--pass)} .dot.fail{background:var(--fail)} .dot.run{background:var(--ink-soft)}
-  .step .name{font-size:14px;font-weight:600;flex:1}
-  .step .detail{font-size:12px;color:var(--ink-soft)}
-  .step .ms{font-size:11px;color:var(--ink-soft)}
-  .shot{width:100%;border-radius:10px;border:1px solid var(--line);margin-top:16px}
-  .hash{display:flex;gap:8px;align-items:flex-start;background:var(--bg);border-radius:8px;
-    padding:10px 12px;margin-top:16px;font-size:11px}
-  .hash .h{font-family:var(--mono);word-break:break-all}
-  .hidden{display:none}
+  .step .mark{width:20px;flex:none;text-align:center;font-size:14px}
+  .step .mark.pass{color:var(--pass)}
+  .step .mark.fail{color:var(--fail)}
+  .step .mark.run{color:var(--muted)}
+  .step .name{font-size:13px;font-weight:600;color:var(--warm-white)}
+  .step .detail{font-size:12px;color:var(--muted);font-weight:300;margin-top:2px}
+  .step .ms{font-size:11px;color:rgba(248,244,238,0.35);margin-left:auto;flex:none}
+  .shot{width:100%;border:1px solid rgba(255,255,255,0.12);margin-top:2px}
+  .hashbox{background:var(--blue-deep);border-left:4px solid var(--gold);padding:16px 20px;margin-top:2px}
+  .hashbox .k{font-size:9px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:rgba(248,244,238,0.4);margin-bottom:8px}
+  .hashbox .h{font-family:var(--mono);font-size:11px;color:var(--gold);word-break:break-all}
+  .report-actions{display:flex;justify-content:center;margin-top:40px}
+
+  /* ─── Stats bar ─── */
+  .stats{background:var(--blue-bright);padding:44px 60px;display:flex;justify-content:center}
+  .stat{text-align:center;padding:0 48px}
+  .stat .num{font-family:var(--serif);font-size:58px;font-weight:300;line-height:1;color:var(--gold);letter-spacing:-.02em}
+  .stat .label{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:rgba(248,244,238,0.55);margin-top:10px}
+  .stat-sep{width:1px;background:rgba(255,255,255,0.15);align-self:stretch;margin:0 8px}
+
+  /* ─── About split ─── */
+  .about{display:grid;grid-template-columns:1fr 1fr;min-height:580px}
+  .about-photo{position:relative;overflow:hidden}
+  .about-photo img{width:100%;height:100%;object-fit:cover}
+  .float-stat{position:absolute;bottom:40px;right:-1px;background:var(--blue-bright);padding:28px 36px;border-left:4px solid var(--gold)}
+  .float-stat .num{font-family:var(--serif);font-size:44px;font-weight:300;color:var(--gold);line-height:1}
+  .float-stat .label{font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:rgba(248,244,238,0.6);margin-top:8px}
+  .about-text{background:var(--blue-mid);display:flex;flex-direction:column;justify-content:center;padding:80px 72px}
+  .about-text .eyebrow{margin-bottom:28px}
+  .about-text h2{font-family:var(--serif);font-size:50px;font-weight:300;line-height:1.18;margin-bottom:32px}
+  .about-text h2 em{font-style:italic;color:var(--gold)}
+  .about-text p{font-size:15px;line-height:1.9;color:rgba(248,244,238,0.6);margin-bottom:20px;font-weight:300}
+  .text-link{display:inline-flex;align-items:center;gap:12px;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);text-decoration:none;margin-top:24px}
+  .text-link .arrow{font-size:16px}
+
+  /* ─── Services (what we test) ─── */
+  .services{background:var(--blue-deep);padding:90px 60px}
+  .section-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:64px}
+  .section-head .eyebrow{margin-bottom:22px}
+  .section-head h2{font-family:var(--serif);font-size:52px;font-weight:300;line-height:1.15}
+  .section-link{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);text-decoration:none;border-bottom:1.5px solid var(--gold);padding-bottom:3px}
+  .svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
+  .svc{background:var(--blue-mid);overflow:hidden;cursor:pointer;transition:background-color .2s}
+  .svc:hover{background:var(--blue-light)}
+  .svc-photo{height:200px;overflow:hidden;position:relative}
+  .svc-photo img{width:100%;height:100%;object-fit:cover}
+  .svc-photo .wash{position:absolute;inset:0;background:rgba(10,22,40,0.35)}
+  .svc-photo .num{position:absolute;top:20px;left:20px;font-family:var(--serif);font-style:italic;font-size:15px;color:var(--gold);letter-spacing:.04em}
+  .svc-body{padding:32px 32px 40px}
+  .svc-body .divider{margin-bottom:20px}
+  .svc-body h3{font-size:20px;font-weight:600;color:var(--warm-white);margin-bottom:16px;line-height:1.3}
+  .svc-body p{font-size:14px;line-height:1.8;color:rgba(248,244,238,0.55);font-weight:300}
+
+  /* ─── How it works tiles ─── */
+  .how{background:var(--blue-mid);padding:90px 60px;border-top:1px solid rgba(255,255,255,0.05)}
+  .how .eyebrow{justify-content:center;margin-bottom:22px}
+  .how h2{font-family:var(--serif);font-size:52px;font-weight:300;text-align:center;margin-bottom:64px}
+  .tile-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px}
+  .tile{padding:32px 28px;background:var(--blue-deep);cursor:default;border-bottom:2px solid transparent;transition:all .2s}
+  .tile:hover{background:var(--blue-light);border-bottom-color:var(--gold)}
+  .tile .divider{width:28px;margin-bottom:18px}
+  .tile .t-num{font-family:var(--serif);font-style:italic;font-size:14px;color:var(--gold);margin-bottom:12px}
+  .tile .t-name{font-size:15px;font-weight:600;color:var(--warm-white);line-height:1.3;margin-bottom:10px}
+  .tile .t-desc{font-size:12px;color:var(--muted);line-height:1.6;font-weight:300}
+
+  /* ─── CTA band ─── */
+  .cta-band{position:relative;overflow:hidden}
+  .cta-band>img{width:100%;height:360px;object-fit:cover}
+  .cta-overlay{position:absolute;inset:0;background:linear-gradient(90deg,rgba(10,22,40,0.97) 50%,rgba(10,22,40,0.6) 100%);display:flex;align-items:center}
+  .cta-inner{max-width:1280px;margin:0 auto;padding:0 60px;width:100%;display:flex;justify-content:space-between;align-items:center}
+  .cta-inner h2{font-family:var(--serif);font-size:54px;font-weight:300;line-height:1.15;margin-bottom:16px}
+  .cta-inner p{font-size:15px;color:rgba(248,244,238,0.6);line-height:1.7;font-weight:300}
+  .cta-inner .btn-gold{width:auto;flex-shrink:0;padding:18px 52px}
+
+  /* ─── Footer ─── */
+  footer{background:var(--footer-deep);padding:72px 60px 44px}
+  .foot-grid{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:2.2fr 1fr 1fr 1fr;gap:56px;margin-bottom:56px}
+  .foot-brand .brand{font-weight:700;font-size:16px;letter-spacing:.2em;color:var(--gold);text-transform:uppercase;margin-bottom:4px}
+  .foot-brand .sub{font-weight:300;font-size:9px;letter-spacing:.26em;color:var(--muted);text-transform:uppercase;margin-bottom:24px}
+  .foot-brand p{font-size:13px;line-height:1.85;color:rgba(248,244,238,0.35);max-width:260px;font-weight:300}
+  .socials{display:flex;gap:16px;margin-top:32px}
+  .socials div{width:36px;height:36px;border:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);cursor:pointer;text-transform:uppercase;font-weight:600;letter-spacing:.05em}
+  .foot-col .head{font-size:10px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:24px}
+  .foot-col ul{list-style:none;display:flex;flex-direction:column;gap:13px}
+  .foot-col a{font-size:13px;color:rgba(248,244,238,0.38);text-decoration:none;font-weight:300}
+  .foot-col a:hover{color:rgba(248,244,238,0.7)}
+  .foot-bottom{max-width:1280px;margin:0 auto;border-top:1px solid rgba(255,255,255,0.06);padding-top:28px;display:flex;justify-content:space-between;align-items:center}
+  .foot-bottom,.foot-bottom a{font-size:12px;color:rgba(248,244,238,0.22);text-decoration:none}
+  .foot-bottom .legal{display:flex;gap:28px}
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <div class="eyebrow">Deterministic · auditable</div>
-  <h1>See a real browser test your site — and prove it.</h1>
-  <p class="sub">Not a chatbot guessing. A real browser actually runs the steps, and hands you a signed, timestamped record you can keep.</p>
+<!-- ─── NAV ─── -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="wordmark">
+      <span class="brand">Proof</span>
+      <span class="sub">Testing as a Service</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#services">What we test</a></li>
+      <li><a href="#about">Why Proof</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+    <button class="btn-ghost-gold" onclick="scrollToHero()">Run a Test</button>
+  </div>
+</nav>
 
-  <!-- STEP 1+2: land + describe -->
-  <div class="card" id="setup">
-    <label for="url">1 · Paste a URL to test</label>
-    <input type="url" id="url" placeholder="https://your-site.com" value="https://alphacv.alphadatarecruitment.ae/" />
-
-    <label style="margin-top:22px">2 · What would you like to test?</label>
-    <input type="text" id="desc" placeholder="e.g. check the page loads and the login screen appears" />
-    <div class="picks" id="picks">
-      <div class="pick" data-pick="page_load">Page load</div>
-      <div class="pick" data-pick="user_login">User login</div>
+<!-- ─── HERO with live test launcher ─── -->
+<section class="hero" id="hero">
+  <img src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=1600&q=80&fit=crop" alt="City skyline at dusk" />
+  <div class="overlay"></div>
+  <div class="hero-content">
+    <div>
+      <div class="eyebrow">
+        <div class="line"></div>
+        <span>Real Browsers · Real Proof</span>
+      </div>
+      <h1>See your website<br /><em>tested and proven</em><br />in seconds.</h1>
+      <p class="lede">Paste a URL and tell us what to check in plain English. A real Chromium browser runs every step — then hands you a signed, tamper-evident record you can keep.</p>
     </div>
 
-    <div class="row">
-      <button class="btn" id="runBtn">Run test</button>
-    </div>
-    <div class="lock">
-      <span>🔒</span>
-      <span>Testing behind a login? That unlocks after sign-up, with credentials stored in a secure vault — never typed here.</span>
+    <div class="launcher" id="launcher">
+      <div class="eyebrow">
+        <div class="line"></div>
+        <span>Run a free test now</span>
+      </div>
+      <div class="field">
+        <label for="url"><b>01</b> — Paste a URL to test</label>
+        <input type="text" id="url" placeholder="https://your-site.com · localhost:3000 · C:\path\to\page.html" value="https://alphacv.alphadatarecruitment.ae/" />
+      </div>
+      <div class="field">
+        <label for="desc"><b>02</b> — What would you like to test?</label>
+        <input type="text" id="desc" placeholder="e.g. check the page loads and the login screen appears" />
+        <div class="picks" id="picks">
+          <button class="pick" data-pick="page_load">Page Load</button>
+          <button class="pick" data-pick="user_login">User Login</button>
+        </div>
+      </div>
+      <button class="btn-gold" id="runBtn">Run Test</button>
+      <div class="error" id="launchError"></div>
+      <div class="lock">
+        <span>🔒</span>
+        <span>Testing behind a login? That unlocks after sign-up, with credentials stored in a secure vault — never typed here.</span>
+      </div>
     </div>
   </div>
+</section>
 
-  <!-- STEP 3+4: run + proof -->
-  <div class="card hidden" id="report">
-    <div class="verdict" id="verdict"></div>
+<!-- ─── REPORT / PROOF (revealed after a run starts) ─── -->
+<section id="report-section">
+  <div class="report-card">
+    <div class="eyebrow">
+      <div class="line"></div>
+      <span>Your Test Report</span>
+      <div class="line"></div>
+    </div>
+    <h2 id="reportTitle">A real browser, <em>showing its work.</em></h2>
+    <div class="verdict" id="verdict">
+      <span class="v-main">Running…</span>
+      <span class="v-side">Real browser · Chromium</span>
+    </div>
     <div class="meta" id="meta"></div>
-    <div id="steps"></div>
-    <img class="shot hidden" id="shot" alt="Screenshot captured during the test" />
-    <div class="hash hidden" id="hashbox">
-      <span>🛡️</span>
-      <div><div style="color:var(--ink-soft)">SHA-256 trace hash (tamper-evident)</div>
-      <div class="h" id="hash"></div></div>
+    <div class="steps" id="steps"></div>
+    <img class="shot" id="shot" alt="Screenshot captured during the test" style="display:none" />
+    <div class="hashbox" id="hashbox" style="display:none">
+      <div class="k">SHA-256 trace hash · tamper-evident</div>
+      <div class="h" id="hash"></div>
     </div>
-    <div class="row" style="margin-top:20px">
-      <button class="btn ghost" id="againBtn">Run another</button>
+    <div class="report-actions">
+      <button class="btn-ghost-gold" id="againBtn">Run Another Test</button>
     </div>
   </div>
+</section>
 
-</div>
+<!-- ─── STATS BAR ─── -->
+<section class="stats">
+  <div class="stat"><div class="num">100%</div><div class="label">Real Browser Runs</div></div>
+  <div class="stat-sep"></div>
+  <div class="stat"><div class="num">SHA-256</div><div class="label">Signed Trace, Every Run</div></div>
+  <div class="stat-sep"></div>
+  <div class="stat"><div class="num">&lt;60s</div><div class="label">From URL to Proof</div></div>
+  <div class="stat-sep"></div>
+  <div class="stat"><div class="num">0</div><div class="label">Credentials Stored</div></div>
+</section>
+
+<!-- ─── ABOUT / WHY PROOF ─── -->
+<section class="about" id="about">
+  <div class="about-photo">
+    <img src="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=900&q=80&fit=crop" alt="Engineer reviewing a test report" />
+    <div class="float-stat">
+      <div class="num">1:1</div>
+      <div class="label">Every Step, Evidenced</div>
+    </div>
+  </div>
+  <div class="about-text">
+    <div class="eyebrow">
+      <div class="line"></div>
+      <span>Why Proof</span>
+    </div>
+    <h2>Not a chatbot guessing.<br /><em>A browser that shows its work.</em></h2>
+    <p>Most AI testing tools read your page and tell you what they think. Proof launches a real Chromium browser, performs each check against your live site, and records what actually happened — step by step, millisecond by millisecond.</p>
+    <p>Every run produces a screenshot and a SHA-256-hashed trace. If anyone alters a single step of the record, the hash breaks. That's evidence you can hand to a client, an auditor, or your own team.</p>
+    <a href="#hero" class="text-link" onclick="scrollToHero(event)"><span>Run your first test</span><span class="arrow">→</span></a>
+  </div>
+</section>
+
+<!-- ─── WHAT WE TEST ─── -->
+<section class="services" id="services">
+  <div class="container" style="padding:0">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">
+          <div class="line"></div>
+          <span>What We Test</span>
+        </div>
+        <h2>Checks on the free tier</h2>
+      </div>
+      <a href="#hero" class="section-link" onclick="scrollToHero(event)">Run a free test →</a>
+    </div>
+    <div class="svc-grid">
+      <div class="svc">
+        <div class="svc-photo">
+          <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&q=80&fit=crop" alt="Team at work" />
+          <div class="wash"></div><div class="num">01</div>
+        </div>
+        <div class="svc-body">
+          <div class="divider"></div>
+          <h3>Availability &amp; Performance</h3>
+          <p>A real page load with HTTP status verification, title capture, and a hard load-time budget — measured from an actual browser, not a ping.</p>
+        </div>
+      </div>
+      <div class="svc">
+        <div class="svc-photo">
+          <img src="https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=600&q=80&fit=crop" alt="Secure infrastructure" />
+          <div class="wash"></div><div class="num">02</div>
+        </div>
+        <div class="svc-body">
+          <div class="divider"></div>
+          <h3>Security Essentials</h3>
+          <p>HTTPS enforcement and login-screen presence, confirmed by inspecting the rendered page — the way a visitor would actually see it.</p>
+        </div>
+      </div>
+      <div class="svc">
+        <div class="svc-photo">
+          <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600&q=80&fit=crop" alt="Professional reviewing documents" />
+          <div class="wash"></div><div class="num">03</div>
+        </div>
+        <div class="svc-body">
+          <div class="divider"></div>
+          <h3>Auditable Proof</h3>
+          <p>Every run ends with a full-page screenshot and a SHA-256-hashed trace of each step — a tamper-evident record that belongs to you.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── HOW IT WORKS ─── -->
+<section class="how" id="how">
+  <div class="container" style="padding:0">
+    <div class="eyebrow">
+      <div class="line"></div>
+      <span>How It Works</span>
+      <div class="line"></div>
+    </div>
+    <h2>From URL to proof in four steps</h2>
+    <div class="tile-grid">
+      <div class="tile">
+        <div class="divider"></div>
+        <div class="t-num">01</div>
+        <div class="t-name">Paste your URL</div>
+        <div class="t-desc">Any public site. Private and internal targets are blocked on the free tier by design.</div>
+      </div>
+      <div class="tile">
+        <div class="divider"></div>
+        <div class="t-num">02</div>
+        <div class="t-name">Describe the test</div>
+        <div class="t-desc">Plain English, or one tap on a quick pick. We map it to concrete, supported checks.</div>
+      </div>
+      <div class="tile">
+        <div class="divider"></div>
+        <div class="t-num">03</div>
+        <div class="t-name">A real browser runs it</div>
+        <div class="t-desc">Chromium performs each step against your live site — read-only, hard-timeboxed.</div>
+      </div>
+      <div class="tile">
+        <div class="divider"></div>
+        <div class="t-num">04</div>
+        <div class="t-name">Keep the proof</div>
+        <div class="t-desc">Verdict, timings, screenshot, and a SHA-256 trace hash. Yours to keep and verify.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── CTA BAND ─── -->
+<section class="cta-band" id="contact">
+  <img src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1600&q=80&fit=crop" alt="Office towers" />
+  <div class="cta-overlay">
+    <div class="cta-inner">
+      <div>
+        <h2>Stop taking <em style="font-style:italic;color:var(--gold)">"it works"</em> on faith.</h2>
+        <p>Your first test is free — no sign-up, no credentials, proof in under a minute.</p>
+      </div>
+      <button class="btn-gold" onclick="scrollToHero()">Run a Free Test</button>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOOTER ─── -->
+<footer>
+  <div class="foot-grid">
+    <div class="foot-brand">
+      <div class="brand">Proof</div>
+      <div class="sub">Testing as a Service</div>
+      <p>Deterministic, auditable website testing. A real browser runs your checks and hands you evidence — not opinions.</p>
+      <div class="socials"><div>in</div><div>tw</div><div>gh</div></div>
+    </div>
+    <div class="foot-col">
+      <div class="head">Product</div>
+      <ul>
+        <li><a href="#services">What we test</a></li>
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#hero">Run a free test</a></li>
+        <li><a href="#">Sample report</a></li>
+      </ul>
+    </div>
+    <div class="foot-col">
+      <div class="head">Company</div>
+      <ul>
+        <li><a href="#about">Why Proof</a></li>
+        <li><a href="#">Security</a></li>
+        <li><a href="#">Pricing</a></li>
+        <li><a href="#">Contact</a></li>
+      </ul>
+    </div>
+    <div class="foot-col">
+      <div class="head">Developers</div>
+      <ul>
+        <li><a href="#">API docs</a></li>
+        <li><a href="#">Trace verification</a></li>
+        <li><a href="#">Status</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot-bottom">
+    <div>© 2026 Proof. All rights reserved.</div>
+    <div class="legal">
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms</a>
+    </div>
+  </div>
+</footer>
 
 <script>
 // Point this at your backend. Default assumes local dev.
-const API = window.API_BASE || "http://localhost:8000";
+const API = window.API_BASE || "http://localhost:8001";
+
+function scrollToHero(e){
+  if (e) e.preventDefault();
+  document.getElementById("hero").scrollIntoView({behavior:"smooth"});
+  setTimeout(() => document.getElementById("url").focus(), 500);
+}
 
 let activePick = null;
 const picks = document.getElementById("picks");
@@ -127,64 +485,83 @@ document.getElementById("desc").addEventListener("input", () => {
 });
 
 const runBtn = document.getElementById("runBtn");
+const launchError = document.getElementById("launchError");
 runBtn.addEventListener("click", runFlow);
 document.getElementById("againBtn").addEventListener("click", () => {
-  document.getElementById("report").classList.add("hidden");
-  document.getElementById("setup").classList.remove("hidden");
+  document.getElementById("report-section").style.display = "none";
+  scrollToHero();
 });
+
+function showError(msg){
+  launchError.textContent = msg;
+  launchError.style.display = "block";
+}
 
 async function runFlow(){
   const url = document.getElementById("url").value.trim();
   const desc = document.getElementById("desc").value.trim();
-  if (!url) { alert("Add a URL first."); return; }
-  if (!activePick && !desc) { alert("Pick an option or describe what to test."); return; }
+  launchError.style.display = "none";
+  if (!url) { showError("Add a URL first."); return; }
+  if (!activePick && !desc) { showError("Pick an option or describe what to test."); return; }
 
   runBtn.disabled = true; runBtn.textContent = "Planning…";
   try {
-    // STEP 2: plan -> check ids
+    // STEP 1: plan -> check ids
     const planRes = await fetch(API + "/plan", {
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ url, description: desc || null, quick_pick: activePick })
     });
     if(!planRes.ok) throw new Error((await planRes.json()).detail || "Planning failed");
-    const { checks } = await planRes.json();
+    const plan = await planRes.json();
+    const checks = plan.checks;
+    const target = plan.target || url;  // backend-normalized (adds https://, converts file paths)
 
-    // STEP 3: run (this is the real browser doing work)
+    // STEP 2: run (this is the real browser doing work)
     runBtn.textContent = "Running real browser…";
     showRunning(checks);
     const runRes = await fetch(API + "/run", {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ url, checks })
+      body: JSON.stringify({ url: target, checks })
     });
     if(!runRes.ok) throw new Error((await runRes.json()).detail || "Run failed");
     const result = await runRes.json();
 
-    // STEP 4: proof
+    // STEP 3: proof
     renderProof(result);
   } catch (err) {
-    alert(err.message);
+    document.getElementById("report-section").style.display = "none";
+    if (err instanceof TypeError) {
+      // fetch itself failed — the test engine isn't reachable
+      showError("Can't reach the test engine at " + API + ". Start the backend first: " +
+                "open a terminal in the backend folder and run  python -m uvicorn app:app --port 8001");
+    } else {
+      showError(err.message);
+    }
   } finally {
-    runBtn.disabled = false; runBtn.textContent = "Run test";
+    runBtn.disabled = false; runBtn.textContent = "Run Test";
   }
 }
 
 function showRunning(checks){
-  document.getElementById("setup").classList.add("hidden");
-  document.getElementById("report").classList.remove("hidden");
-  document.getElementById("verdict").className = "verdict partial";
-  document.getElementById("verdict").innerHTML = "<span>Running…</span><span>real browser</span>";
+  const section = document.getElementById("report-section");
+  section.style.display = "block";
+  const v = document.getElementById("verdict");
+  v.className = "verdict";
+  v.innerHTML = '<span class="v-main">Running…</span><span class="v-side">Real browser · Chromium</span>';
   document.getElementById("meta").innerHTML = "";
   document.getElementById("steps").innerHTML = checks.map(c =>
-    `<div class="step"><div class="dot run">•</div><div class="name">${c}</div></div>`).join("");
-  document.getElementById("shot").classList.add("hidden");
-  document.getElementById("hashbox").classList.add("hidden");
+    `<div class="step"><div class="mark run">•</div><div><div class="name">${c}</div></div></div>`).join("");
+  document.getElementById("shot").style.display = "none";
+  document.getElementById("hashbox").style.display = "none";
+  section.scrollIntoView({behavior:"smooth"});
 }
 
 function renderProof(r){
   const v = document.getElementById("verdict");
   const pass = r.verdict === "PASS";
-  v.className = "verdict " + (pass ? "pass":"partial");
-  v.innerHTML = `<span>${r.verdict} · ${r.steps_passed}/${r.steps_total} steps</span><span>real browser · Chromium</span>`;
+  v.className = "verdict " + (pass ? "" : "fail");
+  v.innerHTML = `<span class="v-main">${r.verdict} · ${r.steps_passed}/${r.steps_total} steps</span>
+                 <span class="v-side">Real browser · Chromium</span>`;
 
   document.getElementById("meta").innerHTML = `
     <div><div class="k">Target</div><div class="v">${r.target}</div></div>
@@ -193,7 +570,7 @@ function renderProof(r){
 
   document.getElementById("steps").innerHTML = r.steps.map(s => `
     <div class="step">
-      <div class="dot ${s.status}">${s.status==="pass"?"✓":"✕"}</div>
+      <div class="mark ${s.status}">${s.status==="pass"?"✓":"✕"}</div>
       <div style="flex:1"><div class="name">${s.name}</div><div class="detail">${s.detail}</div></div>
       <div class="ms">${s.ms} ms</div>
     </div>`).join("");
@@ -203,12 +580,12 @@ function renderProof(r){
   const shot = document.getElementById("shot");
   if (shotStep) {
     shot.src = API + shotStep.shot_url;
-    shot.classList.remove("hidden");
+    shot.style.display = "block";
   } else {
-    shot.classList.add("hidden");
+    shot.style.display = "none";
   }
 
-  document.getElementById("hashbox").classList.remove("hidden");
+  document.getElementById("hashbox").style.display = "block";
   document.getElementById("hash").textContent = r.trace_sha256;
 }
 </script>
