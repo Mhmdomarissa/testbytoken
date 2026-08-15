@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} · UTS{% endblock %}
+{% block content %}
+<nav class="breadcrumbs"><a href="{{ url_for('web.dashboard') }}">Projects</a><span>/</span><span>{{ project.name }}</span></nav>
+
+<section class="page-heading project-header">
+  <div class="project-title">
+    <div class="project-icon large">{{ project.name[:2]|upper }}</div>
+    <div>
+      <div class="row-inline"><h1>{{ project.name }}</h1><span class="status {{ project.status|lower }}">{{ project.status }}</span></div>
+      <a class="url" href="{{ project.application_url }}" target="_blank" rel="noreferrer">{{ project.application_url }}</a>
+    </div>
+  </div>
+  <div class="actions">
+    {% if can('projects', 'edit') %}<button class="button ghost" data-dialog-open="edit-project">Edit</button>{% endif %}
+    {% if can('projects', 'delete') %}<button class="button danger" data-dialog-open="delete-project">Delete</button>{% endif %}
+    {% if can('projects', 'execute') %}
+    <form method="post" action="{{ url_for('web.scan_project', project_id=project.id) }}" data-run-location-sync>
+      <button class="button primary" type="submit">Scan application</button>
+    </form>
+    <form method="post" action="{{ url_for('web.stop_project', project_id=project.id) }}" class="stop-form">
+      <button class="button danger" type="submit" title="Stop scan or automation and close browser">Stop</button>
+    </form>
+    {% endif %}
+  </div>
+</section>
+
+{% if request.args.get('job') %}
+  <section class="job-banner" data-scan-job="{{ request.args.get('job') }}" data-project-id="{{ project.id }}">
+    <span class="spinner"></span>
+    <div class="job-banner-body"><strong>Job running</strong><p>Starting local browser…</p></div>
+    <button class="button danger job-stop" type="button" data-stop-project="{{ project.id }}">Stop</button>
+  </section>
+{% endif %}
+{% if request.args.get('execution') %}
+  <section class="job-banner" data-execution-job="{{ request.args.get('execution') }}" data-project-id="{{ project.id }}">
+    <span class="spinner"></span>
+    <div class="job-banner-body"><strong>Automation running</strong><p>Waiting for execution status…</p></div>
+    <button class="button danger job-stop" type="button" data-stop-project="{{ project.id }}">Stop</button>
+  </section>
+{% endif %}
+
+<section class="stats">
+  <article><strong>{{ modules|length }}</strong><span>Modules</span></article>
+  <article><strong>{{ test_cases|length }}</strong><span>Test cases</span></article>
+  <article><strong>{{ executions|length }}</strong><span>Recent runs</span></article>
+</section>
+
+{% if can('projects', 'execute') and not my_worker %}
+<section class="card worker-setup-banner" style="margin-bottom:18px">
+  <div class="section-heading">
+    <div>
+      <h2>Worker not connected on this PC</h2>
+      <p class="muted">If you chose <strong>Server</strong> below, Chrome opens on the UTS server — not on your laptop. To run on <strong>this PC</strong>, download and run the connector first.</p>
+    </div>
+    <div class="actions worker-connect-actions">
+      <a class="button primary" href="{{ url_for('web.download_install_auto_worker', platform='win') }}">Windows (.bat)</a>
+      <a class="button primary" href="{{ url_for('web.download_install_auto_worker_mac') }}">Mac (.sh)</a>
+    </div>
+  </div>
+  <p class="hint" style="margin:0"><strong>Mac:</strong> Terminal → <code>chmod +x ~/Downloads/UTS-Connect-*.sh &amp;&amp; ~/Downloads/UTS-Connect-*.sh</code> — installs to <code>~/UTS-Worker</code> and starts worker automatically.</p>
+</section>
+{% endif %}
+
+{% if can('projects', 'execute') %}
+<section class="card run-location-picker" id="run-location-picker">
+  <div class="section-heading">
+    <div>
+      <h2>Where should the browser run?</h2>
+      <p class="muted">Applies to Scan, Generate, Run automation, and Full pipeline.</p>
+    </div>
+  </div>
+  <div class="run-location-options">
+    <label class="run-location-option">
+      <input type="radio" name="run_location_choice" value="local" {% if my_worker %}checked{% endif %}>
+      <span class="run-location-body">
+        <strong>My PC (local)</strong>
+        {% if my_worker %}
+          <small class="pill pass">Worker · {{ my_worker.machine_name }}</small>
+        {% else %}
+          <small class="pill fail">Not connected — choose Server, or download connector manually</small>
+        {% endif %}
+      </span>
+    </label>
+    <label class="run-location-option">
+      <input type="radio" name="run_location_choice" value="server" {% if not my_worker %}checked{% endif %}>
+      <span class="run-location-body">
+        <strong>Server</strong>
+        <small>Browser opens on the UTS server machine</small>
+      </span>
+    </label>
+  </div>
+</section>
+{% endif %}
+
+<div class="tabs" data-tabs>
+  <button class="active" data-tab="modules">Modules & generation</button>
+  <button data-tab="tests">Test cases</button>
+  <button data-tab="history">History & reports</button>
+</div>
+
+<section class="tab-panel active" data-panel="modules">
+  <form method="post" action="{{ url_for('web.generate_project', project_id=project.id) }}" class="card" data-run-location-sync>
+    <div class="section-heading">
+      <div><h2>Discovered modules</h2><p class="muted">Select modules. <strong>Free AI (offline)</strong> understands the app and builds test steps, verification, data-driven rows, and BDD. Or create test cases manually in the Test cases tab.</p></div>
+      <div class="actions"><button type="button" class="button text" data-select-all>Select all</button><button type="button" class="button text" data-deselect-all>Deselect all</button></div>
+    </div>
+    {% if modules %}
+      <div class="module-grid" data-check-group>
+        {% for module in modules %}
+          <label class="check-card">
+            <input type="checkbox" name="module_ids" value="{{ module.id }}" {% if module.selected %}checked{% endif %}>
+            <span class="check-ui"></span>
+            <span><strong>{{ module.name }}</strong><small>{{ module.pages|length }} pages · {{ module.flows|length }} flows</small></span>
+          </label>
+        {% endfor %}
+      </div>
+      {% if can('projects', 'execute') %}<div class="form-footer">
+        <button class="button primary" type="submit">AI understand & generate (objects / BDD / data-driven)</button>
+        <button class="button success" formaction="/projects/{{ project.id }}/run-all" type="submit">Run full pipeline (Generate + Execute + Report)</button>
+      </div>{% endif %}
+    {% else %}
+      <div class="empty"><h3>No modules discovered</h3><p>Run an application scan first.</p></div>
+    {% endif %}
+  </form>
+</section>
+
+<section class="tab-panel" data-panel="tests">
+  <div class="card" style="margin-bottom:16px">
+    <div class="section-heading">
+      <div><h2>Create test case manually</h2><p class="muted">Write steps yourself, then run automation. One step per line.</p></div>
+      {% if can('projects', 'create') %}<button class="button primary" type="button" data-dialog-open="new-testcase">Add test case</button>{% endif %}
+    </div>
+    <p class="muted" style="margin:0">Format: <code>Action | Object | Value | Expected | locator_by | locator_value</code></p>
+    <p class="muted" style="margin:6px 0 0">Example: <code>Navigate | Application URL | {{ project.application_url }} | Page loads</code></p>
+    <p class="muted" style="margin:6px 0 0">Example: <code>SetText | Username | standard_user | | id | user-name</code></p>
+    <p class="muted" style="margin:6px 0 0">Example: <code>PerformClick | Login | | Inventory opens | id | login-button</code></p>
+  </div>
+
+  <form method="post" action="{{ url_for('web.execute_project', project_id=project.id) }}" class="card" data-run-location-sync>
+    <div class="section-heading">
+      <div><h2>Automation-ready test cases</h2><p class="muted">Select AI-generated or manual cases and run them in the browser (worker preferred).</p></div>
+      <div class="actions">
+        {% if can('projects', 'create') %}<button class="button ghost" type="button" data-dialog-open="new-testcase">Add manually</button>{% endif %}
+        {% if test_cases and can('projects', 'execute') %}<button class="button success" type="submit">Run automation</button>{% endif %}
+      </div>
+    </div>
+    {% if test_cases %}
+      <div class="testcase-module-groups" data-check-group>
+        {% for group in test_cases_by_module %}
+          <section class="testcase-module-group">
+            <div class="testcase-module-heading">
+              <div>
+                <h3>{{ group.module.name if group.module else 'Other / unassigned' }}</h3>
+                <small>{{ group.cases|length }} test case{{ 's' if group.cases|length != 1 else '' }}</small>
+              </div>
+              <button class="button text" type="button" data-module-select-all>Select all</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th></th><th>ID</th><th>Test case</th><th>Type</th><th>Steps</th></tr></thead>
+                <tbody>
+                {% for tc in group.cases %}
+                  <tr>
+                    <td><input type="checkbox" name="test_case_ids" value="{{ tc.id }}" checked></td>
+                    <td><code>{{ tc.external_key }}</code></td>
+                    <td>{{ tc.name }}</td>
+                    <td><span class="pill {% if tc.test_type == 'positive' %}pass{% elif tc.test_type == 'negative' %}fail{% endif %}">{{ tc.test_type }}</span></td>
+                    <td>{{ (tc.automation_steps or tc.manual_steps or [])|length }}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty"><h3>No tests yet</h3><p>Use Free AI generate after scan, or click <strong>Add test case</strong> to create manually.</p></div>
+    {% endif %}
+  </form>
+</section>
+
+<section class="tab-panel" data-panel="history">
+  <div class="two-column">
+    <div class="card">
+      <div class="section-heading"><h2>Scan history</h2></div>
+      {% for scan in scans %}
+        <div class="history-row">
+          <div><strong>{{ scan.scan_type }}</strong><small>{{ scan.created_at.strftime('%d %b %Y · %H:%M') }}</small></div>
+          <div class="right"><span class="status {{ scan.status|lower }}">{{ scan.status }}</span><small>{{ scan.message }}</small></div>
+        </div>
+      {% else %}<div class="empty compact">No scans yet.</div>{% endfor %}
+    </div>
+    <div class="card">
+      <div class="section-heading"><h2>Execution history</h2></div>
+      {% for run in executions %}
+        <div class="history-row">
+          <div><strong>Run #{{ run.id }}</strong><small>{{ (run.module_names or [])|join(', ') }}</small></div>
+          <div class="right">
+            <span class="status {{ run.status|lower }}">{{ run.status }}</span>
+            <small>{{ run.passed }} passed · {{ run.failed }} failed</small>
+            {% if run.report_path %}<a href="{{ url_for('web.execution_report', execution_id=run.id) }}" target="_blank">Open report</a>{% endif %}
+          </div>
+        </div>
+      {% else %}<div class="empty compact">No executions yet.</div>{% endfor %}
+    </div>
+  </div>
+</section>
+
+<dialog id="edit-project">
+  <form method="post" action="{{ url_for('web.edit_project', project_id=project.id) }}" class="dialog-form">
+    <div class="row-between"><div><span class="eyebrow">Configuration</span><h2>Edit project</h2></div><button type="button" class="icon-button" data-dialog-close>&times;</button></div>
+    <label>Project name<input name="name" required value="{{ project.name }}"></label>
+    <label>Application URL<input name="application_url" type="url" required value="{{ project.application_url }}"></label>
+    <div class="form-grid">
+      <label>Application username<input name="app_username" value="{{ project.app_username }}"></label>
+      <label>New password <span class="optional">Leave blank to retain</span><input name="app_password" type="password"></label>
+    </div>
+    <label>User role
+      <select name="app_role">
+        <option value="" {% if not project.app_role %}selected{% endif %}>(none)</option>
+        <option value="Tester" {% if project.app_role == 'Tester' %}selected{% endif %}>Tester</option>
+        <option value="Admin" {% if project.app_role == 'Admin' %}selected{% endif %}>Admin</option>
+        <option value="Guest User" {% if project.app_role == 'Guest User' %}selected{% endif %}>Guest User</option>
+      </select>
+    </label>
+    <label>Browser<select name="browser"><option value="chrome" {% if project.browser == 'chrome' %}selected{% endif %}>Google Chrome</option><option value="edge" {% if project.browser == 'edge' %}selected{% endif %}>Microsoft Edge</option><option value="firefox" {% if project.browser == 'firefox' %}selected{% endif %}>Mozilla Firefox</option></select></label>
+    <div class="dialog-actions"><button type="button" class="button ghost" data-dialog-close>Cancel</button><button class="button primary" type="submit">Save changes</button></div>
+  </form>
+</dialog>
+
+<dialog id="delete-project">
+  <form method="post" action="{{ url_for('web.delete_project', project_id=project.id) }}" class="dialog-form">
+    <div class="row-between">
+      <div><span class="eyebrow">Danger zone</span><h2>Delete project</h2></div>
+      <button type="button" class="icon-button" data-dialog-close>&times;</button>
+    </div>
+    <p>Delete <strong>{{ project.name }}</strong>? This permanently removes modules, test cases, objects, scan history, and reports for this project.</p>
+    <div class="dialog-actions">
+      <button type="button" class="button ghost" data-dialog-close>Cancel</button>
+      <button class="button danger" type="submit">Yes, delete project</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="new-testcase">
+  <form method="post" action="{{ url_for('web.create_test_case', project_id=project.id) }}" class="dialog-form">
+    <div class="row-between">
+      <div><span class="eyebrow">Manual</span><h2>Add test case</h2></div>
+      <button type="button" class="icon-button" data-dialog-close>&times;</button>
+    </div>
+    <label>Test case name<input name="name" required placeholder="Login and open menu"></label>
+    <label>Type
+      <select name="test_type">
+        <option value="automation">Automation</option>
+        <option value="positive">Positive</option>
+        <option value="negative">Negative</option>
+      </select>
+    </label>
+    <label>Module
+      {% if modules %}
+      <select name="module_name">
+        <option value="Manual">Manual</option>
+        {% for module in modules %}
+        <option value="{{ module.name }}">{{ module.name }}</option>
+        {% endfor %}
+      </select>
+      {% else %}
+      <input name="module_name" value="Manual" placeholder="Manual">
+      {% endif %}
+    </label>
+    <label>Steps (one per line)
+      <textarea name="steps_text" rows="8" placeholder="Navigate | Application URL | {{ project.application_url }} | Page loads
+SetText | Username | standard_user | | id | user-name
+SetPassword | Password | secret_sauce | | id | password
+PerformClick | Login | | Inventory opens | id | login-button
+Verify | Inventory | | Products visible"></textarea>
+    </label>
+    <p class="muted">Actions: Navigate, SetText, SetPassword, PerformClick, PerformSelect, Verify, Delay</p>
+    <div class="dialog-actions">
+      <button type="button" class="button ghost" data-dialog-close>Cancel</button>
+      <button class="button primary" type="submit">Save test case</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

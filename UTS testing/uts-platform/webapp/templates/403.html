@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Access Denied · UTS{% endblock %}
+{% block content %}
+<section class="card access-denied">
+  <span class="eyebrow">403 · Access Denied</span>
+  <h1>You do not have permission to perform this action.</h1>
+  <p class="muted">Your assigned role does not allow access to this module or operation. Contact the Administrator if your responsibilities require it.</p>
+  <a class="button primary" href="{{ url_for('web.index') }}">Return to an authorised module</a>
+</section>
+{% endblock %}

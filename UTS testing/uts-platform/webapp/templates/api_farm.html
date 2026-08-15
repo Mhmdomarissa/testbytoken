@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}API Test · UTS{% endblock %}
+{% block content %}
+<nav class="breadcrumbs"><a href="{{ url_for('web.index') }}">Home</a><span>/</span><span>API Test</span></nav>
+
+<section class="page-heading">
+  <div>
+    <span class="eyebrow">API Testing</span>
+    <h1>API Test</h1>
+    <p class="muted">Test HTTP APIs without Selenium — send requests, check responses, save and run a suite.</p>
+  </div>
+  <div class="actions">
+    {% if can('api_farm', 'create') %}
+    <form method="post" action="{{ url_for('web.api_farm_generate_cases') }}">
+      <button class="button ghost" type="submit">Generate POS/NEG for all</button>
+    </form>
+    {% endif %}
+    {% if can('api_farm', 'execute') %}
+    <form method="post" action="{{ url_for('web.api_farm_run') }}">
+      <button class="button success" type="submit">Run all saved APIs</button>
+    </form>
+    {% endif %}
+    {% if can('reports', 'view') %}<a class="button ghost" href="{{ url_for('web.api_farm_report') }}" target="_blank">Open last report</a>{% endif %}
+  </div>
+</section>
+
+<section class="card howto-guide" style="margin-bottom:18px">
+  <div class="section-heading">
+    <div>
+      <h2>How to use (step by step)</h2>
+      <p class="muted">Follow these steps the first time. A sample GET URL is already filled — try it now.</p>
+    </div>
+  </div>
+  <ol class="howto-steps">
+    <li>
+      <strong>Send a simple request</strong>
+      <p>In <em>Request builder</em>, keep Method <code>GET</code> and the sample URL, then click <strong>Send request</strong>. Check <em>Live response</em> for status and body.</p>
+    </li>
+    <li>
+      <strong>Save the test</strong>
+      <p>Click <strong>Save to collection</strong>. It appears under <em>Saved API tests</em>.</p>
+    </li>
+    <li>
+      <strong>(Optional) Set parameters</strong>
+      <p>In <em>Parameters</em>, add JSON like <code>{"baseUrl":"https://api.example.com"}</code>, click <strong>Save parameters</strong>. Use <code>{{'{{baseUrl}}'}}/login</code> in the URL field.</p>
+    </li>
+    <li>
+      <strong>(Optional) Login + token chain (EscuelaJS example)</strong>
+      <p>Click <strong>Load Login sample</strong> below — Method <code>POST</code>, Expected status <code>201</code> (not 200), extractors <code>[{"name":"token","path":"access_token","source":"json"}]</code>. Send → Save. Then <strong>Load Profile sample</strong> (Bearer <code>{{'{{token}}'}}</code>) and Send again.</p>
+    </li>
+    <li>
+      <strong>Run the suite</strong>
+      <p>Put Login at the top (use ↑ ↓). Click <strong>Run all saved APIs</strong>, then <strong>Open last report</strong>.</p>
+    </li>
+    <li>
+      <strong>(Optional) Import</strong>
+      <p>Use <em>Import OpenAPI / Postman</em> to load many APIs from a JSON file, then run them.</p>
+    </li>
+  </ol>
+  <p class="hint" style="margin-top:12px">
+    Tip: Built-in values you can type anywhere — <code>{{'{{timestamp}}'}}</code>, <code>{{'{{date}}'}}</code>, <code>{{'{{uuid}}'}}</code>, <code>{{'{{token}}'}}</code> (after extract).
+  </p>
+</section>
+
+<section class="card" style="margin-bottom:18px">
+  <div class="section-heading">
+    <div>
+      <h2>1 · Parameters</h2>
+      <p class="muted">Shared values for all requests. Example: <code>{{'{{baseUrl}}'}}</code>, <code>{{'{{username}}'}}</code></p>
+    </div>
+  </div>
+  <label>Collection variables (JSON)
+    <textarea id="api-variables" rows="4" placeholder='{"baseUrl":"https://api.example.com","username":"demo"}'>{{ (collection.variables or {})|tojson }}</textarea>
+  </label>
+  {% if can('api_farm', 'edit') %}<div class="dialog-actions" style="padding:0;margin-top:12px">
+    <button class="button ghost" type="button" id="btn-save-vars">Save parameters</button>
+  </div>{% endif %}
+</section>
+
+{% if can('api_farm', 'import') %}
+<section class="card" style="margin-bottom:18px">
+  <div class="section-heading"><h2>2 · Import OpenAPI / Postman</h2><span class="pill">Optional</span></div>
+  <form method="post" action="{{ url_for('web.api_farm_import') }}" enctype="multipart/form-data" class="dialog-form">
+    <div class="form-grid">
+      <label>Upload JSON file<input type="file" name="file" accept=".json,application/json"></label>
+      <label>Base URL override <span class="optional">OpenAPI only</span><input name="base_url" placeholder="https://api.example.com"></label>
+    </div>
+    <label>Or paste JSON<textarea name="json_text" rows="4" placeholder='Paste OpenAPI/Swagger or Postman Collection v2 JSON here'></textarea></label>
+    <div class="dialog-actions"><button class="button primary" type="submit">Import into collection</button></div>
+  </form>
+</section>
+{% endif %}
+
+<div class="two-column api-farm-layout">
+  <section class="card">
+    <div class="section-heading"><h2>3 · Request builder</h2><span class="pill">Start here</span></div>
+    <form id="api-builder" class="dialog-form" onsubmit="return false;">
+      <label>Name<input id="api-name" name="name" placeholder="Get users / Create order" value="Sample GET"></label>
+      <div class="form-grid">
+        <label>Method
+          <select id="api-method">
+            <option>GET</option>
+            <option>POST</option>
+            <option>PUT</option>
+            <option>PATCH</option>
+            <option>DELETE</option>
+          </select>
+        </label>
+        <label>Expected status<input id="api-expected" type="number" value="200"></label>
+      </div>
+      <label>URL <span class="optional">supports {{'{{var}}'}} / {{'{{timestamp}}'}}</span><input id="api-url" required placeholder="{{'{{baseUrl}}'}}/login or https://api.example.com/login" value="https://jsonplaceholder.typicode.com/posts/1"></label>
+
+      <div class="section-heading compact"><h3>Auth preset</h3></div>
+      <div class="form-grid">
+        <label>Type
+          <select id="api-auth-type">
+            <option value="none">None</option>
+            <option value="bearer">Bearer Token</option>
+            <option value="basic">Basic Auth</option>
+            <option value="apikey">API Key header</option>
+          </select>
+        </label>
+        <label id="auth-token-wrap" class="auth-field hidden">Bearer token<input id="api-auth-token" placeholder="{{'{{token}}'}} or paste JWT"></label>
+      </div>
+      <div class="form-grid auth-field hidden" id="auth-basic-wrap">
+        <label>Username<input id="api-auth-user" autocomplete="off"></label>
+        <label>Password<input id="api-auth-pass" type="password" autocomplete="new-password"></label>
+      </div>
+      <div class="form-grid auth-field hidden" id="auth-apikey-wrap">
+        <label>Header name<input id="api-auth-header" value="X-API-Key"></label>
+        <label>Key value<input id="api-auth-key"></label>
+      </div>
+
+      <label>Headers (JSON)<textarea id="api-headers" rows="3" placeholder='{"Content-Type":"application/json","Authorization":"Bearer {{token}}"}'>{}</textarea></label>
+      <label>Body<textarea id="api-body" rows="5" placeholder='{"username":"{{username}}","password":"secret","ts":"{{timestamp}}"}'></textarea></label>
+
+      <div class="section-heading compact"><h3>Extract from response (chain to next APIs)</h3></div>
+      <p class="muted" style="margin:0 0 8px;font-size:12px">After login succeeds, save values for later requests. Example: name=<code>token</code>, path=<code>access_token</code> or <code>data.token</code></p>
+      <label>Extractors (JSON array)
+        <textarea id="api-extractors" rows="3" placeholder='[{"name":"token","path":"access_token","source":"json"},{"name":"userId","path":"user.id","source":"json"}]'>[]</textarea>
+      </label>
+
+      <div class="section-heading compact"><h3>Operators (assertions)</h3></div>
+      <p class="muted" style="margin:0 0 8px;font-size:12px">Operators: eq, ne, contains, not_contains, gt, gte, lt, lte, regex, exists</p>
+      <label>Operator asserts (JSON array)
+        <textarea id="api-operators" rows="3" placeholder='[{"kind":"json_path","path":"id","operator":"eq","expected":"1"},{"kind":"status","path":"","operator":"eq","expected":"200"}]'>[]</textarea>
+      </label>
+      <label>Assert body contains <span class="optional">Optional</span><input id="api-contains" placeholder="text that must appear in response"></label>
+      <div class="dialog-actions">
+        <button class="button ghost" type="button" id="btn-sample-login">Load Login sample</button>
+        <button class="button ghost" type="button" id="btn-sample-profile">Load Profile sample</button>
+        {% if can('api_farm', 'execute') %}<button class="button primary" type="button" id="btn-send">Send request</button>{% endif %}
+        {% if can('api_farm', 'create') %}
+          <button class="button ghost" type="button" id="btn-save">Save to collection</button>
+          <button class="button ghost" type="button" id="btn-gen-one">Save + POS/NEG</button>
+        {% endif %}
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="section-heading"><h2>4 · Live response</h2><span class="pill" id="api-result-pill">Idle</span></div>
+    <div class="meta" id="api-meta">Click <strong>Send request</strong> on the left. Result appears here.</div>
+    <div class="meta" id="api-extracted" style="margin-top:8px"></div>
+    <pre class="log-box" id="api-response">No response yet.</pre>
+  </section>
+</div>
+
+<section class="card" style="margin-top:18px">
+  <div class="section-heading">
+    <div>
+      <h2>5 · Saved API tests</h2>
+      <p class="muted">Run order = chain order. Put <strong>Login</strong> first, then APIs that need <code>{{'{{token}}'}}</code>. Use ↑ ↓ to reorder.</p>
+    </div>
+    <span class="pill">{{ (collection.requests or [])|length }} requests</span>
+  </div>
+  {% if collection.requests %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Name</th><th>Method</th><th>Extract</th><th>URL</th><th>Expect</th><th>Tags</th><th></th></tr></thead>
+        <tbody id="api-request-rows">
+        {% for req in collection.requests %}
+          <tr data-req-id="{{ req.id }}">
+            <td class="order-cell">{{ loop.index }}</td>
+            <td><strong>{{ req.name }}</strong><small class="block">{{ req.id }}</small></td>
+            <td><span class="pill">{{ req.method }}</span></td>
+            <td>{% if req.extractors %}{% for e in req.extractors %}<span class="pill pass">{{ e.name }}</span> {% endfor %}{% else %}—{% endif %}</td>
+            <td><code class="locator">{{ req.url }}</code></td>
+            <td>{{ req.expected_status }}</td>
+            <td>{% for t in (req.tags or []) %}<span class="pill {% if t == 'positive' %}pass{% elif t == 'negative' %}fail{% endif %}">{{ t }}</span> {% endfor %}</td>
+            <td>
+              {% if can('api_farm', 'edit') %}
+              <button type="button" class="button text small" data-move-up title="Move up">↑</button>
+              <button type="button" class="button text small" data-move-down title="Move down">↓</button>
+              <button type="button" class="button text small" data-load-api='{{ req|tojson }}'>Load</button>
+              {% endif %}
+              {% if can('api_farm', 'create') %}
+              <form method="post" action="{{ url_for('web.api_farm_generate_cases') }}" style="display:inline">
+                <input type="hidden" name="request_id" value="{{ req.id }}">
+                <button class="button text small" type="submit">+/-</button>
+              </form>
+              {% endif %}
+              {% if can('api_farm', 'delete') %}
+              <form method="post" action="{{ url_for('web.api_farm_delete', req_id=req.id) }}" style="display:inline" onsubmit="return confirm('Delete this API test?');">
+                <button class="button text small" type="submit">Delete</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty compact"><h3>No saved API tests yet</h3><p>Send a request and save, or import OpenAPI/Postman.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

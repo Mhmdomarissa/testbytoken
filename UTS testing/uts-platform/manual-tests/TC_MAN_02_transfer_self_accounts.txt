@@ -1,0 +1,54 @@
+================================================================================
+TEST CASE: TC_MAN_02 - Transfer Between Self Accounts (Full Flow)
+Type: MANUAL | Priority: High | Module: Transfers
+================================================================================
+
+Objective:
+Verify that a logged-in user can complete a transfer between their own
+accounts with valid data and receive a success confirmation.
+
+Preconditions:
+- User is logged in to SMART BANK (see TC_MAN_01)
+- User has at least two linked accounts with sufficient balance
+
+Test Data:
+  Source Account:      Business Chequing
+  Destination Account: Personal Online Savings
+  Amount:              1.20
+  Transfer Date:       30 Jun 2026
+  Frequency:           Once
+  Message:             E2E manual test transfer
+
+--------------------------------------------------------------------------------
+Steps  Action Reference    Input Value                    Expected Result
+--------------------------------------------------------------------------------
+1       Navigate to         Transfer Between My Accounts Transfer screen opens
+        Transfers menu
+
+2       Send from           Business Chequing              Source account selected
+
+3       Send to             Personal Online Savings        Destination account selected
+
+4       Amount              1.20                           Amount field accepts value
+
+5       Transfer date       30 Jun 2026                    Date is set correctly
+
+6       Frequency           Once                           Frequency shows Once
+
+7       Message             E2E manual test transfer       Optional message saved
+
+8       Continue            (click)                        Review/confirm screen shown
+
+9       Confirm transfer    (click)                        Success message displayed;
+                                                           transfer reference shown
+
+--------------------------------------------------------------------------------
+Expected Result:
+Transfer completes successfully with confirmation message and updated balances.
+
+Postconditions:
+Verify transaction appears in account history. Reverse if test environment
+requires cleanup.
+
+Status: [ ] Pass  [ ] Fail  [ ] Blocked
+Tester: _______________   Date: _______________   Remarks: _______________

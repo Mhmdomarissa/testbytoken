@@ -1,0 +1,134 @@
+================================================================================
+  UTS — User Guide for Jack (JackTest)
+  Portal: http://144.91.113.113:5050
+================================================================================
+
+LOGIN
+  Username : JackTest
+  Password : C!sco@123
+  Role     : Tester (Scan & Run only)
+
+--------------------------------------------------------------------------------
+1) OPEN UTS AND LOGIN
+--------------------------------------------------------------------------------
+  1. Browser → http://144.91.113.113:5050/login
+  2. Enter JackTest / C!sco@123
+  3. Click Login
+  4. You will see Projects list
+
+--------------------------------------------------------------------------------
+2) WHERE SHOULD THE BROWSER RUN?
+--------------------------------------------------------------------------------
+  On every project page, choose ONE:
+
+  A) My PC (local)
+       → Chrome / Edge opens on JACK'S laptop
+       → You must connect the Worker first (see section 3)
+
+  B) Server
+       → Browser opens on UTS server (144.91.113.113)
+       → You will NOT see the browser on your screen
+       → No Worker needed
+
+--------------------------------------------------------------------------------
+3) OPTION A — RUN ON JACK'S MACHINE (LOCAL)
+--------------------------------------------------------------------------------
+  ONE-TIME / EACH DAY — connect Worker:
+
+  Windows:
+    1. Login as JackTest
+    2. If banner says "Worker not connected", click Windows (.bat)
+    3. Double-click the downloaded UTS-Connect-*.bat
+    4. Keep that black window OPEN
+    5. Refresh UTS page → green pill "Worker · <PC-name>"
+
+  Mac:
+    1. Login as JackTest
+    2. Click Mac (.sh)
+    3. In Terminal:
+         chmod +x ~/Downloads/UTS-Connect-*.sh
+         ~/Downloads/UTS-Connect-*.sh
+    4. Keep Terminal open
+    5. Refresh UTS → green Worker pill
+
+  THEN RUN:
+    1. Open your project
+    2. Select "My PC (local)"
+    3. Click "Scan application"  (or Generate / Run)
+    4. Watch browser open on YOUR PC
+    5. Use Stop to cancel if needed
+
+  LOCAL CHECKLIST
+    [ ] Logged in as JackTest
+    [ ] Worker window open + green Worker pill
+    [ ] My PC (local) selected
+    [ ] Chrome or Edge installed
+    [ ] App URL reachable from your PC (VPN if required)
+
+--------------------------------------------------------------------------------
+4) OPTION B — RUN ON SERVER MACHINE
+--------------------------------------------------------------------------------
+    1. Login as JackTest
+    2. Open project
+    3. Select "Server"
+    4. Click Scan / Generate / Run
+    5. Wait for job to finish
+    6. Open History & reports for results
+
+  SERVER CHECKLIST
+    [ ] Logged in as JackTest
+    [ ] Server selected
+    [ ] App URL reachable FROM the UTS server
+
+--------------------------------------------------------------------------------
+5) TYPICAL FLOW FOR JACK
+--------------------------------------------------------------------------------
+  Recommended (see browser on desk):
+
+    Login → Start Worker → Open project
+         → My PC (local) → Scan
+         → Select modules → AI generate
+         → Select cases → Run automation
+         → Open report
+
+  If Worker offline / no VPN to app:
+
+    Login → Open project → Server → Scan/Run → Report
+
+--------------------------------------------------------------------------------
+6) BUTTON MEANING
+--------------------------------------------------------------------------------
+  Scan application     = Open browser, discover modules
+  AI understand & generate = Create test cases from modules
+  Run automation       = Execute selected tests in browser
+  Run full pipeline    = Generate + Execute + Report
+  Stop                 = Cancel job and close browser
+
+--------------------------------------------------------------------------------
+7) COMMON PROBLEMS
+--------------------------------------------------------------------------------
+  Worker not connected
+    → Download connector, run it, keep window open, refresh page
+
+  Browser opens on server, not my PC
+    → You chose Server — switch to My PC (local)
+
+  Job stuck / browser frozen
+    → Click Stop, then retry
+
+  Mac script will not run
+    → chmod +x then run the .sh again
+
+  Windows blocks .bat
+    → More info → Run anyway
+
+--------------------------------------------------------------------------------
+8) SECURITY
+--------------------------------------------------------------------------------
+  - Do not share JackTest password outside the team
+  - Do not email your connector file to other people
+  - Ask Admin to reset password if needed
+
+================================================================================
+  Full Markdown guide: docs/JackTest-User-Guide.md
+================================================================================

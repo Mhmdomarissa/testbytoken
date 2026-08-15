@@ -1,0 +1,32 @@
+================================================================================
+TEST CASE: TC_MAN_02 — Explore Application Under Test after login
+Type: MANUAL (auto-generated) | Source URL: http://127.0.0.1:8765/index.html
+================================================================================
+
+Objective:
+Validate explore application under test after login on Application Under Test.
+
+Preconditions:
+- Application URL is reachable: http://127.0.0.1:8765/index.html
+- Valid credentials: admin_user / ********
+
+Test Data:
+  URL:      http://127.0.0.1:8765/index.html
+  Username: admin_user
+  Password: ********
+
+--------------------------------------------------------------------------------
+Step   Action           Object                   Input/Expected                
+--------------------------------------------------------------------------------
+1      Verify           Logged-in page           URL: http://127.0.0.1:8765/index.html
+2      Verify           Page heading             SMART BANK                    
+3      PerformClick     Transfers                'Transfers' opens             
+--------------------------------------------------------------------------------
+
+Expected Result:
+'Transfers' opens
+
+Status: [ ] Pass  [ ] Fail  [ ] Blocked
+Tester: _______________   Date: _______________
+
+Generated: 2026-07-08T11:21:49

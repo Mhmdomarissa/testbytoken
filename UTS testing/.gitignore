@@ -1,0 +1,21 @@
+# Portable Python runtime — 96.6 MB / 4,009 files.
+# Not committed: it is re-downloaded by the connector from
+# /download/portable-python-win64.zip, or replaced by a local venv.
+uts-platform/runtime/
+
+# Secrets and live state — never commit.
+# web-data/ holds worker-token.json, a live Bearer token for the UTS account,
+# and the local SQLite database.
+uts-platform/web-data/
+uts-platform/.env
+uts-platform/worker.env
+*.db
+*.sqlite
+*.sqlite3
+
+# Local virtualenv, if RUN-WEB.bat is used instead of the portable runtime
+uts-platform/.venv/
+
+__pycache__/
+*.pyc
+*.pyo

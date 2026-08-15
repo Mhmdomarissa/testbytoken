@@ -1,0 +1,34 @@
+================================================================================
+TEST CASE: TC_MAN_01 — Login to Application Under Test
+Type: MANUAL (auto-generated) | Source URL: http://127.0.0.1:8765/index.html
+================================================================================
+
+Objective:
+Validate login to application under test on Application Under Test.
+
+Preconditions:
+- Application URL is reachable: http://127.0.0.1:8765/index.html
+- Valid credentials: admin_user / ********
+
+Test Data:
+  URL:      http://127.0.0.1:8765/index.html
+  Username: admin_user
+  Password: ********
+
+--------------------------------------------------------------------------------
+Step   Action           Object                   Input/Expected                
+--------------------------------------------------------------------------------
+1      Navigate         Application URL          http://127.0.0.1:8765/index.html
+2      SetText          Username                 admin_user                    
+3      SetText          Password                 ********                      
+4      PerformClick     Login                    User lands on home/dashboard  
+5      Verify           Post-login page          Dashboard or home visible     
+--------------------------------------------------------------------------------
+
+Expected Result:
+Dashboard or home visible
+
+Status: [ ] Pass  [ ] Fail  [ ] Blocked
+Tester: _______________   Date: _______________
+
+Generated: 2026-07-08T11:21:49

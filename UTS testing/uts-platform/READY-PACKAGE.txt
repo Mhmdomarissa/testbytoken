@@ -1,0 +1,54 @@
+================================================================================
+  UTS — Ready Package (Direct Use)
+  Server: http://144.91.113.113:5050
+================================================================================
+
+LOGIN (fixed)
+  Username: admin
+  Password: admin
+
+Home page brand shows: UTS
+
+--------------------------------------------------------------------------------
+INSTALL ON SERVER (one time)
+--------------------------------------------------------------------------------
+1. Copy this ZIP to the server and extract, e.g.:
+     C:\UTS\UTS-Test-Automation-Suite
+
+2. Install Python 3.10+ (Add to PATH) and Google Chrome
+
+3. Double-click SETUP.bat
+   (or RESET-ADMIN.bat if login was broken before)
+
+4. Confirm .env has:
+     UTS_ADMIN_USERNAME=admin
+     UTS_ADMIN_PASSWORD=admin
+     UTS_SYNC_ADMIN_PASSWORD=true
+     UTS_SIMPLE_PASSWORDS=true
+     UTS_HOST=0.0.0.0
+     UTS_PORT=5050
+     UTS_PUBLIC_URL=http://144.91.113.113:5050
+
+5. Allow firewall TCP 5050
+
+6. Double-click RUN-WEB.bat  (keep window open)
+
+7. Open: http://144.91.113.113:5050/login
+   Login with admin / admin
+
+--------------------------------------------------------------------------------
+IF LOGIN STILL FAILS
+--------------------------------------------------------------------------------
+1. Stop RUN-WEB.bat
+2. Run RESET-ADMIN.bat
+3. Start RUN-WEB.bat again
+4. Login admin / admin
+
+--------------------------------------------------------------------------------
+LOCAL PC
+--------------------------------------------------------------------------------
+1. SETUP.bat
+2. RUN-WEB.bat
+3. http://127.0.0.1:5050/login  →  admin / admin
+
+================================================================================

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}UTS{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <h1>UTS</h1>
+    <p class="muted">Manage automation projects and API tests.</p>
+  </div>
+  <div class="actions">
+    {% if can('api_farm', 'view') %}<a class="button ghost" href="{{ url_for('web.api_farm') }}">API Test</a>{% endif %}
+    {% if can('projects', 'create') %}<button class="button primary" data-dialog-open="new-project">New project</button>{% endif %}
+  </div>
+</section>
+
+{% if can('projects', 'execute') and not my_worker %}
+<section class="card worker-setup-banner">
+  <div class="section-heading">
+    <div>
+      <h2>Connect this PC first</h2>
+      <p class="muted">Browser automation on <strong>your machine</strong> needs the UTS worker running locally. Right now no worker is connected for <strong>{{ current_user.username if current_user else session.get('username') }}</strong>.</p>
+    </div>
+    <div class="actions worker-connect-actions">
+      <a class="button primary" href="{{ url_for('web.download_install_auto_worker', platform='win') }}">Windows (.bat)</a>
+      <a class="button primary" href="{{ url_for('web.download_install_auto_worker_mac') }}">Mac (.sh)</a>
+    </div>
+  </div>
+  <ol class="howto-steps compact-steps">
+    <li><strong>Windows</strong> — run the <code>.bat</code> file. <strong>Mac</strong> — open Terminal, run: <code>chmod +x ~/Downloads/UTS-Connect-{{ current_user.username if current_user else 'user' }}.sh &amp;&amp; ~/Downloads/UTS-Connect-{{ current_user.username if current_user else 'user' }}.sh</code></li>
+    <li><strong>Enter your UTS password</strong> when the black window asks for it.</li>
+    <li><strong>Keep the worker window open</strong> (minimized is OK).</li>
+    <li><strong>Refresh this page</strong> — header should show <span class="pill pass">Worker · YourPCName</span>.</li>
+    <li>Open a project → choose <strong>My PC (local)</strong> → Scan / Run.</li>
+  </ol>
+</section>
+{% endif %}
+
+<section class="stats">
+  <article><strong>{{ totals.projects }}</strong><span>Projects</span></article>
+  <article><strong>{{ totals.modules }}</strong><span>Modules</span></article>
+  <article><strong>{{ totals.objects }}</strong><span>UI objects</span></article>
+  <article><strong>{{ totals.executions }}</strong><span>Executions</span></article>
+</section>
+
+<section class="card">
+  <div class="section-heading">
+    <div>
+      <h2>Recent projects</h2>
+      {% if is_admin %}
+        <p class="muted" style="margin:4px 0 0">Administrator view — all projects from every user.</p>
+      {% else %}
+        <p class="muted" style="margin:4px 0 0">Showing only projects you created.</p>
+      {% endif %}
+    </div>
+    <span class="pill">{% if is_admin %}All{% else %}Mine{% endif %} · {{ projects|length }} total</span>
+  </div>
+  {% if projects %}
+    <div class="project-grid">
+      {% for project in projects %}
+        <a class="project-card" href="{{ url_for('web.project_detail', project_id=project.id) }}">
+          <div class="project-icon">{{ project.name[:2]|upper }}</div>
+          <div class="project-body">
+            <div class="row-between">
+              <h3>{{ project.name }}</h3>
+              <span class="status {{ project.status|lower }}">{{ project.status }}</span>
+            </div>
+            <p>{{ project.application_url }}</p>
+            <div class="meta">
+              <span>{{ project.browser|title }}</span>
+              <span>{{ project.modules|length }} modules</span>
+              {% if is_admin and project_creators.get(project.created_by) %}
+                <span>Owner · {{ project_creators.get(project.created_by) }}</span>
+              {% endif %}
+              <span>Updated {{ project.updated_at.strftime('%d %b %H:%M') }}</span>
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <h3>No projects yet</h3>
+      {% if can('projects', 'create') %}
+        <p>Create your first project to begin application discovery.</p>
+      {% else %}
+        <p>You only see projects you created. Ask an Administrator to create a project for you or grant create permission.</p>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+
+{% if can('projects', 'create') %}
+<dialog id="new-project">
+  <form method="post" action="{{ url_for('web.create_project') }}" class="dialog-form">
+    <div class="row-between">
+      <div><span class="eyebrow">Configuration</span><h2>New project</h2></div>
+      <button type="button" class="icon-button" data-dialog-close>&times;</button>
+    </div>
+    <label>Project name<input name="name" required placeholder="Customer Portal"></label>
+    <label>Application URL<input name="application_url" type="url" required placeholder="https://api.xpediteapi.ai/"></label>
+    <div class="form-grid">
+      <label>Application username <span class="optional">Optional</span><input name="app_username" autocomplete="off"></label>
+      <label>Application password <span class="optional">Optional</span><input name="app_password" type="password" autocomplete="new-password"></label>
+    </div>
+    <label>User role <span class="optional">Xpedite: Tester / Admin / Guest User</span>
+      <select name="app_role">
+        <option value="">(none)</option>
+        <option value="Tester" selected>Tester</option>
+        <option value="Admin">Admin</option>
+        <option value="Guest User">Guest User</option>
+      </select>
+    </label>
+    <label>Browser
+      <select name="browser">
+        <option value="chrome">Google Chrome</option>
+        <option value="edge">Microsoft Edge</option>
+        <option value="firefox">Mozilla Firefox</option>
+      </select>
+    </label>
+    <div class="dialog-actions">
+      <button type="button" class="button ghost" data-dialog-close>Cancel</button>
+      <button class="button primary" type="submit">Create project</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,288 @@
+================================================================================
+  UTS TEST AUTOMATION SUITE — DEVELOPER HANDOFF
+  Project: D:\A\UTS-Test-Automation-Suite
+  Date: July 2026
+================================================================================
+
+1. OVERVIEW
+-----------
+This tool automates web application testing in two cycles using ONE entry point
+(RUN.bat). It:
+
+  - Opens the app URL and logs in
+  - Scans modules (Cycle 1) OR runs functional tests on selected module(s) (Cycle 2)
+  - Discovers forms, buttons, sub-pages, and actions
+  - Generates test cases automatically
+  - Exports to ALM format (Excel + XML)
+  - Exports to Xpedite format (TC/BPW/BC XML + TestData.xlsx)
+  - Runs Selenium automation and produces HTML report
+
+Same RUN.bat is used for both cycles. Only config\app-input.json changes.
+
+
+2. WHAT WAS DONE (SUMMARY)
+--------------------------
+
+A) Two-cycle flow (single RUN.bat) — REQUIRED ORDER
+   RUN 1 — SCAN MODULES
+     "module": ""  → login → list all modules → save modules.json → STOP
+     (NO test cases created)
+
+   RUN 2 — CREATE TEST CASES for selected module (DEFAULT: no automation)
+     "module": "Admin"  (or "Admin#PIM")
+     → verify module exists in modules.json
+     → understand that module's pages
+     → create test cases + ALM + Xpedite export
+     → automation DOES NOT run (default "run_automation": false)
+
+   RUN 3 — RUN AUTOMATION (only when user explicitly enables)
+     "run_automation": true   (or run:  RUN.bat --run)
+     → creates TCs + runs automation + HTML report
+
+B) Page Intelligence (Cycle 2 only — selected modules)
+   Visits selected module + sub-pages. For each page records:
+     - Page type (list, form, list_with_crud, etc.)
+     - Fields, buttons, search, table rows
+     - Capabilities (search, create, update, delete, form_fill)
+   Outputs:
+     - generated\page-map.json
+     - reports\latest-page-map.html
+
+C) Full functional E2E automation (Cycle 2)
+   End-to-end flow per module:
+     Login -> Open module -> Search list -> Click Add -> Fill form fields
+     -> Save -> Verify notification -> Explore sub-tabs -> Verify complete
+   - Sub-nav tabs only (sidebar links excluded — fixes wrong Admin click on PIM)
+   - Missing elements SKIPPED (no crash); login steps still fail hard
+
+D) Common Automation Actions (dynamic\common_actions.py)
+   Supported / mapped actions include:
+     Trigger, Condition, Loop, Variable, Compose, ParseJSON, FilterData,
+     HttpRequest, SendEmail, CreateFile, ReadFile, UpdateRecord, DeleteRecord,
+     Delay, Approval, Notification, RunScript, ExecuteSQL, ErrorHandling,
+     LogMessage, End, Terminate
+
+E) ALM export (NEW — alm\exporter.py)
+   - Cycle 1: alm-output\ALM_ModuleCatalog.xlsx (one test stub per module)
+   - Cycle 2: alm-output\ALM_TestCases.xlsx + ALM_TestCases.xml
+   - After run: ALM file updated with Passed/Failed status
+   - Config: config\alm.json
+
+F) Xpedite export (xpedite\exporter.py)
+   - Output folder: xpedite-output\
+   - TC_*.xml, BPW_*.xml, BC_*.xml, TestData.xlsx
+
+G) Bug fixes
+   - Windows Unicode console crash (UTF-8 in RUN.bat + run_automation_only.py)
+   - ChromeDriver lock timeout (automation\selenium_session.py)
+   - Graceful skip when UI element not found
+
+
+3. REQUIREMENTS
+---------------
+  - Windows 10/11
+  - Python 3.10+ (recommended)
+  - Google Chrome browser
+  - Internet access (for demo URL or your app)
+
+  Dependencies install automatically on first RUN.bat run, or manually:
+    pip install -r requirements.txt
+
+
+4. HOW TO RUN
+-------------
+
+STEP 0 — One-time setup
+  1. Open folder: D:\A\UTS-Test-Automation-Suite
+  2. Edit config\app-input.json with your app URL, username, password
+
+STEP 1 — Cycle 1 (Scan modules)
+  1. Set in config\app-input.json:
+       "module": ""
+     (leave module blank)
+
+  2. Double-click RUN.bat
+     OR run:  python run_automation_only.py --scan-only
+
+  3. Browser opens -> login -> all modules scanned -> browser closes
+
+  4. Check outputs:
+       generated\modules.json
+       generated\discovered-flow.json
+       generated\common-actions.json
+       alm-output\ALM_ModuleCatalog.xlsx
+
+  5. Pick a module name from modules.json (e.g. Admin, PIM, Leave)
+
+
+STEP 2 — Cycle 2 (Functional test selected module)
+  1. Edit config\app-input.json:
+       "module": "Admin"
+     Multiple modules (hash separated):
+       "module": "Admin#PIM#Leave"
+
+  2. Double-click SAME RUN.bat again
+
+  3. Tool verifies module exists in modules.json, then:
+       - Discovers forms/actions for that module only
+       - Exports ALM + Xpedite test cases
+       - Runs Selenium automation
+       - Writes HTML report
+
+  4. Check outputs:
+       alm-output\ALM_TestCases.xlsx
+       alm-output\ALM_TestCases.xml
+       alm-output\alm-export-summary.json
+       xpedite-output\          (TC/BPW/BC XML + TestData.xlsx)
+       reports\latest-e2e-report.html
+       logs\module-tc-run-*.log
+
+
+5. CONFIG FILES
+---------------
+
+config\app-input.json  (main input)
+  url          — application login URL
+  username     — login user
+  password     — login password
+  app_name     — display name in reports
+  module       — blank = Cycle 1 scan | "Admin" = Cycle 2 create TCs
+  run_automation — false (default) = only create TCs | true = also run automation
+  role         — optional role hint for discovery
+  logout_after_each_test — true/false (default true)
+
+config\alm.json  (ALM export settings)
+  output_path       — default "alm-output"
+  export_excel      — true/false
+  export_xml        — true/false
+  default_priority  — e.g. "Medium"
+  default_test_type — e.g. "Automated"
+  default_status    — e.g. "Design"
+
+config\selenium.json — browser headless/timeout settings
+config\xpedite.json  — Xpedite template paths
+
+
+6. ENTRY POINTS
+---------------
+  RUN.bat              — Main entry (recommended)
+  RUN-SCAN.bat         — Calls RUN.bat (scan alias)
+  RUN-MODULE.bat       — Calls RUN.bat (module run alias)
+  run_automation_only.py — Python main script
+    --scan-only        — Force Cycle 1 even if module is set
+
+
+7. KEY SOURCE FILES
+-------------------
+  run_automation_only.py     — Main two-cycle orchestrator
+  dynamic\discovery.py       — Module/form/button discovery
+  dynamic\automation_runner.py — Selenium step execution
+  dynamic\common_actions.py  — Common action catalog + execution
+  dynamic\module_selector.py — modules.json read/write
+  alm\exporter.py            — ALM Excel + XML export
+  xpedite\exporter.py        — Xpedite XML + Excel export
+  automation\selenium_session.py — Chrome driver setup
+  report_generator.py        — HTML test report
+
+
+8. ALM EXPORT FORMAT
+--------------------
+Excel columns (row per step — import friendly):
+
+  Test ID | Test Name | Module | Priority | Test Type | Status |
+  Step # | Step Description | Action | Input / Data | Expected Result |
+  Automation Path
+
+After automation run, Status column shows Passed or Failed where applicable.
+
+XML: alm-output\ALM_TestCases.xml (TestCase > Steps structure)
+
+
+9. XPEDITE EXPORT
+-----------------
+Folder: xpedite-output\
+  - TC_*.xml   — Test cases
+  - BPW_*.xml  — Business process workflows
+  - BC_*.xml   — Business components
+  - TestData.xlsx — Test data sheet
+
+Actions mapped include: PerformClick, SetText, UpdateRecord, DeleteRecord,
+Approval, Delay, LogMessage, Verify, etc.
+
+
+10. EXAMPLE app-input.json
+--------------------------
+{
+  "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+  "username": "Admin",
+  "password": "admin123",
+  "app_name": "OrangeHRM Demo",
+  "role": "",
+  "module": "",
+  "logout_after_each_test": true
+}
+
+For Cycle 2 change only:
+  "module": "Admin"
+
+
+11. TROUBLESHOOTING
+-------------------
+Problem: Module not found in Cycle 2
+Fix: Run Cycle 1 first (module blank). Use exact name from modules.json.
+
+Problem: Unicode / arrow character error in console
+Fix: Already fixed — RUN.bat sets chcp 65001 and UTF-8 encoding.
+
+Problem: ChromeDriver lock timeout
+Fix: Delete stale lock if exists:
+     C:\Users\<user>\.wdm\.wdm-lock-chromedriver-win64
+     Then re-run RUN.bat.
+
+Problem: Element not found during run
+Behavior: Step is SKIPPED (status SKIP), run continues. Login steps still fail hard.
+
+Problem: modules.json missing in Cycle 2
+Behavior: Tool auto-runs Cycle 1 scan first, then continues.
+
+
+12. FLOW DIAGRAM (TEXT)
+-----------------------
+
+  RUN.bat
+     |
+     v
+  Read config\app-input.json
+     |
+     +-- module is BLANK ---------------------+
+     |                                         |
+     |   Cycle 1: Login -> Scan all modules    |
+     |   Save: modules.json, ALM catalog       |
+     |   STOP                                  |
+     |                                         |
+     +-- module is SET (e.g. "Admin") --------+
+                                               |
+       Cycle 2: Verify module in modules.json  |
+       Discover forms + actions for module      |
+       Export ALM + Xpedite                     |
+       Run Selenium automation                 |
+       Update ALM with results                 |
+       Open report + xpedite folder             |
+
+
+13. NOTES FOR DEVELOPER
+-----------------------
+  - Do not commit passwords in app-input.json to git if repo is shared.
+  - ALM Excel is generic import format. If your ALM tool needs a specific
+    template (HP ALM, Azure DevOps, Jira), share the template and columns
+    can be aligned.
+  - Xpedite output uses TC_ prefix. If TestMagic TS_ format is required,
+    that is a separate converter change in xpedite\exporter.py.
+  - Common actions like SendEmail, RunScript, ExecuteSQL are catalogued but
+    need external config/credentials to execute fully — they log/skip safely.
+
+
+================================================================================
+  END OF HANDOFF
+  Questions: refer to README.md or inspect run_automation_only.py main flow
+================================================================================

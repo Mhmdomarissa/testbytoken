@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Role Management · UTS{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="eyebrow">Administration</span>
+    <h1>Roles & Permissions</h1>
+    <p class="muted">Define module-level and action-level access without code changes.</p>
+  </div>
+  {% if can('role_management', 'create') %}<button class="button primary" data-dialog-open="new-role">Create role</button>{% endif %}
+</section>
+
+<section class="stats">
+  <article><strong>{{ roles|length }}</strong><span>Total roles</span></article>
+  <article><strong>{{ roles|selectattr('is_active')|list|length }}</strong><span>Active roles</span></article>
+  <article><strong>{{ modules|length }}</strong><span>Protected modules</span></article>
+  <article><strong>9</strong><span>Permission actions</span></article>
+</section>
+
+<section class="role-grid">
+  {% for role in roles %}
+    <article class="card role-card">
+      <div class="row-between">
+        <div>
+          <div class="row-inline">
+            <h2>{{ role.name }}</h2>
+            {% if role.is_system %}<span class="pill pass">System</span>{% endif %}
+            {% set mode = detect_role_mode(role) %}
+            {% if mode and ROLE_MODES.get(mode) %}<span class="pill">{{ ROLE_MODES[mode].label }} mode</span>{% endif %}
+            <span class="status {{ 'completed' if role.is_active else 'stopped' }}">{{ 'Active' if role.is_active else 'Inactive' }}</span>
+          </div>
+          <p class="muted">{{ role.description or 'No description' }}</p>
+        </div>
+        <strong class="role-user-count">{{ role.users|length }}</strong>
+      </div>
+      <p class="hint">{{ role.permissions|selectattr('allowed')|list|length }} permissions · {{ role.users|length }} assigned users</p>
+      <div class="actions">
+        {% if can('role_management', 'edit') %}<a class="button ghost small" href="{{ url_for('admin.edit_role_form', role_id=role.id) }}">Permissions</a>{% endif %}
+        {% if can('role_management', 'create') %}
+          <form method="post" action="{{ url_for('admin.clone_role', role_id=role.id) }}"><button class="button ghost small" type="submit">Clone</button></form>
+        {% endif %}
+        {% if can('role_management', 'delete') and not role.is_system %}
+          <form method="post" action="{{ url_for('admin.delete_role', role_id=role.id) }}" onsubmit="return confirm('Delete this role?');"><button class="button danger small" type="submit">Delete</button></form>
+        {% endif %}
+      </div>
+    </article>
+  {% endfor %}
+</section>
+
+{% if can('role_management', 'create') %}
+<dialog id="new-role">
+  <form method="post" action="{{ url_for('admin.create_role') }}" class="dialog-form">
+    <div class="row-between">
+      <div><span class="eyebrow">Role Management</span><h2>Create role</h2></div>
+      <button type="button" class="icon-button" data-dialog-close>&times;</button>
+    </div>
+    <label>Role name<input name="name" required placeholder="Finance User"></label>
+    <label>Role mode
+      <select name="role_mode" required>
+        {% for mode in role_modes %}
+          <option value="{{ mode.key }}" {% if mode.key == 'TestUser' %}selected{% endif %}>{{ mode.label }} — {{ mode.description }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Description<textarea name="description" rows="3" placeholder="What this role is responsible for"></textarea></label>
+    <div class="dialog-actions">
+      <button type="button" class="button ghost" data-dialog-close>Cancel</button>
+      <button class="button primary" type="submit">Create and configure</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% endblock %}

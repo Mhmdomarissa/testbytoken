@@ -1,0 +1,19 @@
+{
+  "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+  "username": "Admin",
+  "password": "admin123",
+  "app_name": "OrangeHRM Demo",
+  "role": "",
+  "module": "",
+  "_comment_module": "RUN 1: module blank = scan modules only | RUN 2: set module e.g. Admin = create TCs",
+  "ai_mode": true,
+  "_comment_ai": "true = AI understands app and builds link/object/enter/verify/data-driven/BDD",
+  "run_automation": false,
+  "_comment_run": "false = sirf test cases banenge | true = TCs + automation bhi chalega",
+  "selected_modules": [],
+  "description": "",
+  "automation_only": true,
+  "logout_after_each_test": true,
+  "show_execution_log_in_report": false,
+  "show_steps_in_browser": true
+}

@@ -1,0 +1,99 @@
+<?xml version="1.0" standalone="yes"?>
+<NewDataSet>
+  <xs:schema id="NewDataSet" xmlns="" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xs:element name="NewDataSet" msdata:IsDataSet="true" msdata:UseCurrentLocale="true">
+      <xs:complexType>
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+          <xs:element name="Table">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="Execute_x0024_" type="xs:string" minOccurs="0" />
+                <xs:element name="UserId" type="xs:string" minOccurs="0" />
+                <xs:element name="TestDescription" type="xs:string" minOccurs="0" />
+                <xs:element name="MainBatchPath" type="xs:string" minOccurs="0" />
+                <xs:element name="Priority" type="xs:string" minOccurs="0" />
+                <xs:element name="Language" type="xs:string" minOccurs="0" />
+                <xs:element name="Module" type="xs:string" minOccurs="0" />
+                <xs:element name="Build" type="xs:string" minOccurs="0" />
+                <xs:element name="TestCycle" type="xs:string" minOccurs="0" />
+                <xs:element name="TestEnv" type="xs:string" minOccurs="0" />
+                <xs:element name="Impact" type="xs:string" minOccurs="0" />
+                <xs:element name="SpecialData" type="xs:string" minOccurs="0" />
+                <xs:element name="ScheduleTime" type="xs:string" minOccurs="0" />
+                <xs:element name="Remarks" type="xs:string" minOccurs="0" />
+                <xs:element name="Project" type="xs:string" minOccurs="0" />
+                <xs:element name="SubProject" type="xs:string" minOccurs="0" />
+                <xs:element name="Id" type="xs:int" minOccurs="0" />
+                <xs:element name="PFBuild" type="xs:string" minOccurs="0" />
+                <xs:element name="MaxExecTime" type="xs:string" minOccurs="0" />
+                <xs:element name="TakeScreenShot" type="xs:string" minOccurs="0" />
+                <xs:element name="SeqNo" type="xs:int" minOccurs="0" />
+                <xs:element name="TestData" type="xs:int" minOccurs="0" />
+                <xs:element name="BrowserName" type="xs:string" minOccurs="0" />
+                <xs:element name="MobileDeviceName" type="xs:string" minOccurs="0" />
+                <xs:element name="PerformanceTestingScriptFlag" type="xs:boolean" minOccurs="0" />
+                <xs:element name="IsSecurityEnabled" type="xs:boolean" minOccurs="0" />
+                <xs:element name="FeatureFileName" type="xs:string" minOccurs="0" />
+                <xs:element name="FailOverFlag" type="xs:string" minOccurs="0" />
+                <xs:element name="ProcessOwner" type="xs:string" minOccurs="0" />
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="Table1">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="Id" type="xs:int" minOccurs="0" />
+                <xs:element name="SuiteId" type="xs:int" minOccurs="0" />
+                <xs:element name="MainBatchName" type="xs:string" minOccurs="0" />
+                <xs:element name="isSkip" type="xs:boolean" minOccurs="0" />
+                <xs:element name="TestEnv" type="xs:string" minOccurs="0" />
+                <xs:element name="BPWVersion" type="xs:string" minOccurs="0" />
+                <xs:element name="RunFromExcel" type="xs:boolean" minOccurs="0" />
+                <xs:element name="IsPerformanceTC" type="xs:boolean" minOccurs="0" />
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+        </xs:choice>
+      </xs:complexType>
+    </xs:element>
+  </xs:schema>
+  <Table>
+    <Execute_x0024_>Y</Execute_x0024_>
+    <UserId>abhijit.shelar</UserId>
+    <TestDescription>TC_HRM</TestDescription>
+    <MainBatchPath>BPW_HRM</MainBatchPath>
+    <Priority>1</Priority>
+    <Language>English</Language>
+    <Module>Sample</Module>
+    <Build>1</Build>
+    <TestCycle>TestCycle1</TestCycle>
+    <TestEnv>NULL</TestEnv>
+    <Impact>NULL</Impact>
+    <SpecialData>1</SpecialData>
+    <ScheduleTime />
+    <Remarks>NULL</Remarks>
+    <Project>Demo</Project>
+    <SubProject>Demo</SubProject>
+    <Id>14662</Id>
+    <PFBuild>RFS</PFBuild>
+    <MaxExecTime />
+    <TakeScreenShot>True</TakeScreenShot>
+    <SeqNo>4</SeqNo>
+    <TestData>0</TestData>
+    <BrowserName>Chrome</BrowserName>
+    <MobileDeviceName>Default</MobileDeviceName>
+    <PerformanceTestingScriptFlag>true</PerformanceTestingScriptFlag>
+    <IsSecurityEnabled>false</IsSecurityEnabled>
+    <FeatureFileName>NULL</FeatureFileName>
+    <FailOverFlag>1</FailOverFlag>
+    <ProcessOwner />
+  </Table>
+  <Table1>
+    <Id>14690</Id>
+    <SuiteId>14662</SuiteId>
+    <MainBatchName>BPW_HRM</MainBatchName>
+    <isSkip>false</isSkip>
+    <TestEnv>RFS</TestEnv>
+    <BPWVersion>Latest</BPWVersion>
+  </Table1>
+</NewDataSet>

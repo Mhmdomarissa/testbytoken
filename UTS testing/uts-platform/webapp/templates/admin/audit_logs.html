@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Audit Logs · UTS{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="eyebrow">Security</span>
+    <h1>Audit Logs</h1>
+    <p class="muted">Administrative activity, authentication events, permission changes, and access denials.</p>
+  </div>
+  <div class="actions">
+    {% if can('audit_logs', 'print') %}<button class="button ghost" type="button" onclick="window.print()">Print</button>{% endif %}
+    {% if can('audit_logs', 'export') %}<a class="button primary" href="{{ url_for('admin.export_audit_logs') }}">Export CSV</a>{% endif %}
+  </div>
+</section>
+
+<form class="card filter-bar" method="get">
+  <label>Action
+    <select name="action"><option value="">All actions</option>{% for action in actions %}<option value="{{ action }}" {% if selected_action == action %}selected{% endif %}>{{ action }}</option>{% endfor %}</select>
+  </label>
+  <label>Module
+    <select name="module"><option value="">All modules</option>{% for module in modules %}<option value="{{ module }}" {% if selected_module == module %}selected{% endif %}>{{ module }}</option>{% endfor %}</select>
+  </label>
+  <button class="button primary" type="submit">Filter</button>
+</form>
+
+<section class="card">
+  <div class="section-heading"><h2>Activity</h2><span class="pill">{{ logs|length }} entries</span></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date & Time</th><th>User</th><th>Action</th><th>Module</th><th>IP Address</th><th>Remarks</th></tr></thead>
+      <tbody>
+      {% for log in logs %}
+        <tr>
+          <td>{{ log.created_at.strftime('%d %b %Y %H:%M:%S') }}</td>
+          <td>{{ log.actor.username if log.actor else 'System/Unknown' }}</td>
+          <td><span class="pill">{{ log.action }}</span></td>
+          <td><code>{{ log.module }}</code></td>
+          <td><code>{{ log.ip_address or '—' }}</code></td>
+          <td>{{ log.remarks or '—' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6"><div class="empty compact">No audit events match this filter.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

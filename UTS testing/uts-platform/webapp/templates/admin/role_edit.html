@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}{{ role.name }} Permissions · UTS{% endblock %}
+{% block content %}
+<nav class="breadcrumbs"><a href="{{ url_for('admin.roles') }}">Roles & Permissions</a><span>/</span><span>{{ role.name }}</span></nav>
+
+<section class="page-heading">
+  <div>
+    <span class="eyebrow">Permission Matrix</span>
+    <h1>{{ role.name }}</h1>
+    <p class="muted">Each module and action is independently configurable. Changes apply to assigned users immediately.</p>
+    {% if detected_mode and ROLE_MODES.get(detected_mode) %}
+      <p class="hint">Current mode: <strong>{{ ROLE_MODES[detected_mode].label }}</strong> — {{ ROLE_MODES[detected_mode].description }}</p>
+    {% endif %}
+  </div>
+  <a class="button ghost" href="{{ url_for('admin.roles') }}">Back to roles</a>
+</section>
+
+</section>
+
+{% if can('role_management', 'edit') and not role.is_system %}
+<section class="card role-details">
+  <form method="post" action="{{ url_for('admin.apply_role_mode_view', role_id=role.id) }}" class="role-mode-bar">
+    <label>Role mode (quick preset)
+      <select name="role_mode">
+        {% for mode in role_modes %}
+          <option value="{{ mode.key }}" {% if mode.key == 'TestUser' %}selected{% endif %}>{{ mode.label }} — {{ mode.description }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="button ghost" type="submit">Apply mode</button>
+  </form>
+  <p class="hint" style="margin:10px 0 0">Tester mode = view + scan/run only. No project create, edit, or delete.</p>
+</section>
+{% endif %}
+
+<form method="post" action="{{ url_for('admin.edit_role', role_id=role.id) }}">
+  <section class="card role-details">
+    <div class="form-grid">
+      <label>Role name<input name="name" value="{{ role.name }}" required {% if role.is_system %}readonly{% endif %}></label>
+      <label>Description<input name="description" value="{{ role.description }}"></label>
+      <label class="check-line"><input name="is_active" type="checkbox" {% if role.is_active %}checked{% endif %} {% if role.is_system %}disabled{% endif %}> Active role</label>
+    </div>
+  </section>
+
+  <section class="card permission-card">
+    <div class="section-heading">
+      <div><h2>Module access</h2><p class="muted">A hidden button is not security; these permissions are also enforced by the server.</p></div>
+      <div class="actions">
+        <button class="button text" type="button" data-permission-all="on">Select all</button>
+        {% if not role.is_system %}<button class="button text" type="button" data-permission-all="off">Clear all</button>{% endif %}
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="permission-table">
+        <thead>
+          <tr>
+            <th>Module</th>
+            {% for action in ['view','create','edit','delete','approve','export','import','print','execute'] %}
+              <th>{{ action|title }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for module_key, module in modules.items() %}
+          <tr>
+            <td><strong>{{ module.label }}</strong><small class="block"><code>{{ module_key }}</code></small></td>
+            {% for action in ['view','create','edit','delete','approve','export','import','print','execute'] %}
+              <td>
+                {% if action in module.actions %}
+                  <input
+                    type="checkbox"
+                    name="perm__{{ module_key }}__{{ action }}"
+                    aria-label="{{ module.label }} {{ action }}"
+                    {% if (module_key, action) in selected or role.is_system %}checked{% endif %}
+                    {% if role.is_system %}disabled{% endif %}
+                  >
+                  {% if role.is_system %}<input type="hidden" name="perm__{{ module_key }}__{{ action }}" value="on">{% endif %}
+                {% else %}<span class="muted">—</span>{% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="form-footer">
+      <a class="button ghost" href="{{ url_for('admin.roles') }}">Cancel</a>
+      <button class="button primary" type="submit">Save role & permissions</button>
+    </div>
+  </section>
+</form>
+{% endblock %}

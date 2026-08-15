@@ -1,0 +1,7 @@
+{
+  "converter_dynamic_path": "",
+  "template_path": "templates/xpedite",
+  "output_path": "xpedite-output",
+  "export_manual_scenarios": false,
+  "export_automation_scenarios": true
+}

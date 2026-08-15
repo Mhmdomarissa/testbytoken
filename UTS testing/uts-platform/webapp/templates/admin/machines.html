@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Client PCs · UTS{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="eyebrow">Admin</span>
+    <h1>Client PCs</h1>
+    <p class="muted">
+      Simple flow: Admin adds user + IP → download connector → run once on that PC →
+      header shows Worker online → Scan/Generate opens browser on that PC.
+    </p>
+  </div>
+  <a class="button ghost" href="{{ url_for('admin.users') }}">Users</a>
+</section>
+
+<section class="card" style="margin-bottom:1.25rem">
+  <div class="section-heading"><h2>Add client PC</h2></div>
+  <form method="post" action="{{ url_for('admin.create_machine') }}" class="form-grid">
+    <label>User
+      <select name="user_id" required>
+        <option value="">Select user</option>
+        {% for user in users %}
+          <option value="{{ user.id }}">{{ user.username }}{% if user.employee_name %} — {{ user.employee_name }}{% endif %}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Client IP<input name="ip_address" required placeholder="e.g. 192.168.1.45" pattern=".*\S.*"></label>
+    <label>PC label <span class="optional">Optional</span><input name="label" placeholder="Neha laptop"></label>
+    <label>Notes <span class="optional">Optional</span><input name="notes" placeholder="HR desk / 2nd floor"></label>
+    <div class="form-footer" style="grid-column:1/-1">
+      <button class="button primary" type="submit">Save client PC</button>
+    </div>
+  </form>
+  <p class="hint" style="margin-top:.75rem">
+    IP is for admin tracking. Browser cannot open by IP alone from the cloud server —
+    run the connector once on that PC (then it auto-starts at Windows login).
+  </p>
+</section>
+
+<section class="card">
+  <div class="section-heading">
+    <h2>Registered PCs</h2>
+    <span class="pill">{{ machines|length }} total</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>IP</th>
+          <th>Label</th>
+          <th>Status</th>
+          <th>Last seen</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in machines %}
+          {% set st = status_by_user.get(m.user_id, {}) %}
+          <tr>
+            <td>{{ m.user.username if m.user else m.user_id }}</td>
+            <td><code>{{ m.ip_address }}</code></td>
+            <td>{{ m.label or '—' }}</td>
+            <td>
+              {% if st.get('online') %}
+                <span class="pill pass">Online · {{ st.get('machine_name') or 'PC' }}</span>
+              {% else %}
+                <span class="pill fail">Offline — run connector</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if st.get('last_seen_at') %}
+                {{ st.last_seen_at.strftime('%d %b %Y %H:%M') }}
+              {% else %}
+                Never
+              {% endif %}
+            </td>
+            <td class="actions">
+              <a class="button primary small" href="{{ url_for('admin.download_machine_connector', machine_id=m.id) }}">Download connector</a>
+              {% if can('user_management', 'delete') %}
+              <form method="post" action="{{ url_for('admin.delete_machine', machine_id=m.id) }}" style="display:inline" onsubmit="return confirm('Remove this PC?');">
+                <button class="button ghost small" type="submit">Remove</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6"><div class="empty compact">No client PCs yet. Add one above.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}No Access · UTS{% endblock %}
+{% block content %}
+<section class="card access-denied">
+  <span class="eyebrow">Account setup</span>
+  <h1>No module access assigned</h1>
+  <p class="muted">
+    You signed in as <strong>{{ current_user.username if current_user else session.get('username') }}</strong>
+    {% if current_user and current_user.access_role %}
+      (role: <strong>{{ current_user.access_role.name }}</strong>)
+    {% endif %}
+    but this role does not have permission to open any UTS module yet.
+  </p>
+  <p class="muted">Ask an Administrator to open <strong>Admin → Roles</strong>, edit your role, and enable at least <em>View</em> on Projects or API Test.</p>
+  <form method="post" action="{{ url_for('web.logout') }}">
+    <button class="button primary" type="submit">Sign out</button>
+  </form>
+</section>
+{% endblock %}

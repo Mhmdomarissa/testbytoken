@@ -1,0 +1,55 @@
+<?xml version="1.0" standalone="yes"?>
+<NewDataSet>
+  <xs:schema id="NewDataSet" xmlns="" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xs:element name="NewDataSet" msdata:IsDataSet="true" msdata:UseCurrentLocale="true">
+      <xs:complexType>
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+          <xs:element name="Table">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="SeqNo" type="xs:int" minOccurs="0" />
+                <xs:element name="KeywordDrivenTestDataPath" type="xs:string" minOccurs="0" />
+                <xs:element name="IterationCountForSameData" type="xs:string" minOccurs="0" />
+                <xs:element name="IterationCountForDifferentData" type="xs:string" minOccurs="0" />
+                <xs:element name="Skip" type="xs:boolean" minOccurs="0" />
+                <xs:element name="Remarks" type="xs:string" minOccurs="0" />
+                <xs:element name="isLooped" type="xs:boolean" minOccurs="0" />
+                <xs:element name="BCVersion" type="xs:string" minOccurs="0" />
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+        </xs:choice>
+      </xs:complexType>
+    </xs:element>
+  </xs:schema>
+  <Table>
+    <SeqNo>1</SeqNo>
+    <KeywordDrivenTestDataPath>BC_login_HRM</KeywordDrivenTestDataPath>
+    <IterationCountForSameData />
+    <IterationCountForDifferentData />
+    <Skip>false</Skip>
+    <Remarks />
+    <isLooped>false</isLooped>
+    <BCVersion>Latest</BCVersion>
+  </Table>
+  <Table>
+    <SeqNo>2</SeqNo>
+    <KeywordDrivenTestDataPath>BC_Add_Candidates</KeywordDrivenTestDataPath>
+    <IterationCountForSameData />
+    <IterationCountForDifferentData />
+    <Skip>true</Skip>
+    <Remarks />
+    <isLooped>false</isLooped>
+    <BCVersion>Latest</BCVersion>
+  </Table>
+  <Table>
+    <SeqNo>3</SeqNo>
+    <KeywordDrivenTestDataPath>BC_Logout_HRM</KeywordDrivenTestDataPath>
+    <IterationCountForSameData />
+    <IterationCountForDifferentData />
+    <Skip>true</Skip>
+    <Remarks />
+    <isLooped>false</isLooped>
+    <BCVersion>Latest</BCVersion>
+  </Table>
+</NewDataSet>

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMART BANK - Demo</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Segoe UI, Arial, sans-serif; margin: 0; background: #f0f4f8; color: #1a2b4a; }
+    .header { background: #1a2b4a; color: #fff; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+    .header h1 { margin: 0; font-size: 20px; }
+    .screen { display: none; max-width: 520px; margin: 32px auto; background: #fff; padding: 28px;
+              border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+    .screen.active { display: block; }
+    label { display: block; margin: 12px 0 4px; font-weight: 600; font-size: 14px; }
+    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+    button, .btn { display: inline-block; margin-top: 16px; padding: 10px 20px; background: #1a2b4a; color: #fff;
+                   border: none; border-radius: 6px; cursor: pointer; font-size: 14px; text-decoration: none; }
+    button:hover, .btn:hover { background: #2d4a7a; }
+    .nav { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 10px 24px; }
+    .nav a { margin-right: 16px; color: #1a2b4a; font-weight: 600; cursor: pointer; }
+    .success { background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; padding: 14px; border-radius: 6px; }
+    .review-row { padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
+    h2 { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <div class="header"><span>BANK</span><h1>SMART BANK</h1></div>
+
+  <!-- Login -->
+  <div id="screen-login" class="screen active">
+    <h2>Login</h2>
+    <label for="username">Username</label>
+    <input id="username" name="Username" type="text" placeholder="Enter username" />
+    <label for="password">Password</label>
+    <input id="password" name="Password" type="password" placeholder="Enter password" />
+    <button id="btn-login" type="button" onclick="doLogin()">Login</button>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="screen-dashboard" class="screen">
+    <div class="nav">
+      <a id="menu-transfers" onclick="showScreen('screen-transfer-menu')">Transfers</a>
+      <a id="btn-logout" onclick="doLogout()" style="float:right;color:#c53030;">Logout</a>
+    </div>
+    <h2>Dashboard</h2>
+    <p>Welcome, <span id="welcome-user"></span></p>
+    <p>Account summary loaded.</p>
+  </div>
+
+  <!-- Transfer menu -->
+  <div id="screen-transfer-menu" class="screen">
+    <div class="nav"><a onclick="showScreen('screen-dashboard')">Home</a></div>
+    <h2>Transfers</h2>
+    <a id="link-transfer-self" class="btn" onclick="openTransfer()">Transfer Between My Accounts</a>
+  </div>
+
+  <!-- Transfer form -->
+  <div id="screen-transfer" class="screen">
+    <h2 id="page-title">Transfer between my accounts</h2>
+    <label for="send-from">Send from</label>
+    <select id="send-from"><option value="">Select account</option>
+      <option>Business Chequing</option><option>Personal Online Savings</option></select>
+    <label for="send-to">Send to</label>
+    <select id="send-to"><option value="">Select account</option>
+      <option>Business Chequing</option><option>Personal Online Savings</option></select>
+    <label for="amount">Amount</label>
+    <input id="amount" type="text" />
+    <label for="transfer-date">Transfer date</label>
+    <input id="transfer-date" type="text" />
+    <label for="frequency">Frequency</label>
+    <select id="frequency"><option>Once</option><option>Weekly</option><option>Monthly</option></select>
+    <label for="message">Message</label>
+    <textarea id="message" rows="2"></textarea>
+    <button id="btn-continue" type="button" onclick="goReview()">Continue</button>
+  </div>
+
+  <!-- Review -->
+  <div id="screen-review" class="screen">
+    <h2>Review Transfer</h2>
+    <div id="review-details"></div>
+    <button id="btn-confirm" type="button" onclick="confirmTransfer()">Confirm</button>
+  </div>
+
+  <!-- Success -->
+  <div id="screen-success" class="screen">
+    <div id="success-message" class="success">Transfer completed successfully</div>
+    <p id="ref-line"></p>
+  </div>
+
+  <script>
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+    function doLogin() {
+      const u = document.getElementById('username').value;
+      document.getElementById('welcome-user').textContent = u || 'User';
+      showScreen('screen-dashboard');
+    }
+    function doLogout() {
+      document.getElementById('username').value = '';
+      document.getElementById('password').value = '';
+      showScreen('screen-login');
+    }
+    function openTransfer() { showScreen('screen-transfer'); }
+    function goReview() {
+      const d = {
+        from: document.getElementById('send-from').value,
+        to: document.getElementById('send-to').value,
+        amount: document.getElementById('amount').value,
+        date: document.getElementById('transfer-date').value,
+        freq: document.getElementById('frequency').value,
+        msg: document.getElementById('message').value
+      };
+      document.getElementById('review-details').innerHTML =
+        `<div class="review-row"><b>From:</b> ${d.from}</div>` +
+        `<div class="review-row"><b>To:</b> ${d.to}</div>` +
+        `<div class="review-row"><b>Amount:</b> ${d.amount}</div>` +
+        `<div class="review-row"><b>Date:</b> ${d.date}</div>`;
+      showScreen('screen-review');
+    }
+    function confirmTransfer() {
+      document.getElementById('ref-line').textContent = 'Reference: TRX-E2E-' + Date.now();
+      showScreen('screen-success');
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}User Management · UTS{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="eyebrow">Administration</span>
+    <h1>User Management</h1>
+    <p class="muted">Create users, assign roles, control status, reset passwords, and manage access.</p>
+  </div>
+  <div class="actions">
+    {% if can('user_management', 'export') %}<a class="button ghost" href="{{ url_for('admin.export_users') }}">Export CSV</a>{% endif %}
+    {% if can('user_management', 'import') %}<button class="button ghost" data-dialog-open="import-users">Import CSV</button>{% endif %}
+    {% if can('user_management', 'create') %}<button class="button primary" data-dialog-open="new-user">Create user</button>{% endif %}
+  </div>
+</section>
+
+<section class="stats">
+  <article><strong>{{ total }}</strong><span>Matching users</span></article>
+  <article><strong>{{ users|selectattr('is_active')|list|length }}</strong><span>Active</span></article>
+  <article><strong>{{ users|rejectattr('is_active')|list|length }}</strong><span>Inactive</span></article>
+  <article><strong>{{ roles|length }}</strong><span>Available roles</span></article>
+</section>
+
+<form class="card filter-bar" method="get">
+  <label>Search
+    <input name="q" value="{{ search }}" placeholder="Name, username, email, employee ID…">
+  </label>
+  <label>Status
+    <select name="status">
+      {% for value, label in [('all','All users'),('active','Active'),('inactive','Inactive'),('deleted','Deleted')] %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Role
+    <select name="role_id">
+      <option value="">All roles</option>
+      {% for role in roles %}
+        <option value="{{ role.id }}" {% if selected_role_id == role.id %}selected{% endif %}>{{ role.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button class="button primary" type="submit">Filter</button>
+</form>
+
+<section class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Employee</th><th>Username</th><th>Department</th><th>Role</th><th>Status</th><th>Last login</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for user in users %}
+        <tr>
+          <td><strong>{{ user.employee_name or user.username }}</strong><small class="block">{{ user.employee_id or 'No employee ID' }}{% if user.email %} · {{ user.email }}{% endif %}</small></td>
+          <td><code>{{ user.username }}</code></td>
+          <td>{{ user.department or '—' }}<small class="block">{{ user.designation or '' }}</small></td>
+          <td><span class="pill">{{ user.access_role.name if user.access_role else user.role }}</span></td>
+          <td>
+            {% if user.is_deleted %}<span class="status failed">Deleted</span>
+            {% elif user.is_active %}<span class="status completed">Active</span>
+            {% else %}<span class="status stopped">Inactive</span>{% endif %}
+          </td>
+          <td>{{ user.last_login_at.strftime('%d %b %Y %H:%M') if user.last_login_at else 'Never' }}</td>
+          <td>
+            <div class="actions">
+              {% if can('user_management', 'edit') and not user.is_deleted %}
+                <a class="button ghost small" href="{{ url_for('admin.edit_user_form', user_id=user.id) }}">Edit</a>
+                {% if current_user.id != user.id %}
+                <form method="post" action="{{ url_for('admin.toggle_user', user_id=user.id) }}">
+                  <button class="button ghost small" type="submit">{{ 'Deactivate' if user.is_active else 'Activate' }}</button>
+                </form>
+                {% endif %}
+              {% endif %}
+              {% if can('user_management', 'delete') and not user.is_deleted and current_user.id != user.id %}
+                <form method="post" action="{{ url_for('admin.delete_user', user_id=user.id) }}" onsubmit="return confirm('Soft delete this user?');">
+                  <button class="button danger small" type="submit">Delete</button>
+                </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7"><div class="empty compact">No users match this filter.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% if pages > 1 %}
+<nav class="pagination" aria-label="User pages">
+  {% if page > 1 %}<a class="button ghost small" href="{{ url_for('admin.users', q=search, status=status, role_id=selected_role_id, page=page-1) }}">Previous</a>{% endif %}
+  <span>Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}<a class="button ghost small" href="{{ url_for('admin.users', q=search, status=status, role_id=selected_role_id, page=page+1) }}">Next</a>{% endif %}
+</nav>
+{% endif %}
+
+{% if can('user_management', 'create') %}
+<dialog id="new-user">
+  <form method="post" action="{{ url_for('admin.create_user') }}" class="dialog-form wide-form">
+    <div class="row-between">
+      <div><span class="eyebrow">User Management</span><h2>Create user</h2></div>
+      <button type="button" class="icon-button" data-dialog-close>&times;</button>
+    </div>
+    <div class="form-grid">
+      <label>Employee Name<input name="employee_name" required></label>
+      <label>Employee ID<input name="employee_id"></label>
+      <label>Email<input name="email" type="email"></label>
+      <label>Mobile Number<input name="mobile_number" type="tel"></label>
+      <label>Department<input name="department"></label>
+      <label>Designation<input name="designation"></label>
+      <label>Username<input name="username" autocomplete="username" required></label>
+      <label>Password<input name="password" type="password" autocomplete="new-password" required minlength="4"></label>
+      <label>Role
+        <select name="role_id" required>
+          {% for role in roles %}<option value="{{ role.id }}">{{ role.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="check-line"><input name="is_active" type="checkbox" checked> Active user</label>
+    </div>
+    <p class="hint">Password must be at least 4 characters on this server (LAN mode).</p>
+    <div class="dialog-actions">
+      <button type="button" class="button ghost" data-dialog-close>Cancel</button>
+      <button class="button primary" type="submit">Create user</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
+{% if can('user_management', 'import') %}
+<dialog id="import-users">
+  <form method="post" action="{{ url_for('admin.import_users') }}" enctype="multipart/form-data" class="dialog-form">
+    <div class="row-between">
+      <div><span class="eyebrow">Bulk operation</span><h2>Import users</h2></div>
+      <button type="button" class="icon-button" data-dialog-close>&times;</button>
+    </div>
+    <label>CSV file<input name="file" type="file" accept=".csv,text/csv" required></label>
+    <p class="hint">Columns: Employee Name, Employee ID, Email, Mobile Number, Department, Designation, Username, Password, Status, Role. Invalid or duplicate rows are skipped.</p>
+    <div class="dialog-actions">
+      <button type="button" class="button ghost" data-dialog-close>Cancel</button>
+      <button class="button primary" type="submit">Import users</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% endblock %}

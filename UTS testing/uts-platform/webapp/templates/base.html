@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}UTS{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('web.index') }}">
+      <span class="brand-mark">U</span>
+      <span>UTS</span>
+    </a>
+    {% if session.get('user_id') %}
+      <div class="user-menu">
+        {% if can('projects', 'view') %}<a class="button ghost small" href="{{ url_for('web.dashboard') }}">Projects</a>{% endif %}
+        {% if can('api_farm', 'view') %}<a class="button ghost small" href="{{ url_for('web.api_farm') }}">API Test</a>{% endif %}
+        {% if can('user_management', 'view') %}<a class="button ghost small" href="{{ url_for('admin.users') }}">Users</a>{% endif %}
+        {% if can('user_management', 'view') %}<a class="button ghost small" href="{{ url_for('admin.machines') }}">Client PCs</a>{% endif %}
+        {% if can('projects', 'execute') and not my_worker %}
+          <a class="button primary small" href="{{ url_for('web.download_install_auto_worker', platform='win') }}">Connect (Windows)</a>
+          <a class="button ghost small" href="{{ url_for('web.download_install_auto_worker_mac') }}">Connect (Mac)</a>
+        {% endif %}
+        {% if can('role_management', 'view') %}<a class="button ghost small" href="{{ url_for('admin.roles') }}">Roles</a>{% endif %}
+        {% if can('audit_logs', 'view') %}<a class="button ghost small" href="{{ url_for('admin.audit_logs') }}">Audit</a>{% endif %}
+        {% if my_worker %}
+          <span class="pill pass" title="Automation browser will open on your machine">Worker · {{ my_worker.machine_name }}</span>
+        {% else %}
+          <span class="pill" title="Choose Server on the project page, or install local connector manually">No local worker</span>
+        {% endif %}
+        <span>{{ current_user.username if current_user else session.get('username') }}{% if current_user %} · {{ current_user.access_role.name if current_user.access_role else current_user.role }}{% endif %}</span>
+        <form method="post" action="{{ url_for('web.logout') }}">
+          <button class="button ghost small" type="submit">Sign out</button>
+        </form>
+      </div>
+    {% endif %}
+  </header>
+
+  <main class="shell">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

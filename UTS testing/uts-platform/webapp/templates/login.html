@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}UTS{% endblock %}
+{% block content %}
+<section class="auth-wrap farm-login">
+  <div class="auth-copy farm-brand">
+    <div class="farm-logo">
+      <span class="farm-mark">U</span>
+      <div>
+        <h1 class="farm-title">UTS</h1>
+      </div>
+    </div>
+  </div>
+  <form class="card auth-card" method="post">
+    <div>
+      <p class="muted center" style="margin-bottom:4px">Please login to continue</p>
+    </div>
+    <label>Username
+      <input name="username" autocomplete="username" required autofocus placeholder="admin" value="admin">
+    </label>
+    <label>Password
+      <input name="password" type="password" autocomplete="current-password" required placeholder="admin">
+    </label>
+    <button class="button primary full" type="submit">Login</button>
+  </form>
+</section>
+{% endblock %}
