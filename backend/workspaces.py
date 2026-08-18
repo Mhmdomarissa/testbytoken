@@ -52,16 +52,19 @@ class Job:
         self.awaiting: dict | None = None
         self.created_at = time.time()
 
-    def snapshot(self) -> dict:
-        return {
+    def snapshot(self, *, with_result: bool = True) -> dict:
+        snap = {
             "job_id": self.id,
             "kind": self.kind,
             "status": self.status,
-            "result": self.result,
             "error": self.error,
             "awaiting_login": self.awaiting,
             "event_count": len(self.events),
+            "created_at": self.created_at,
         }
+        if with_result:
+            snap["result"] = self.result
+        return snap
 
 
 class Workspace:
@@ -168,6 +171,33 @@ class Workspace:
                 if job.status == "queued":
                     job.status = "running"
 
+    def _kill_tree(self) -> None:
+        """Hard-kill the engine and everything under it.
+
+        On Windows a venv's python.exe re-execs the base interpreter as a child,
+        so the engine we launched is the launcher and the real process is its
+        child — and chromedriver hangs off that. proc.kill() reaps only the
+        launcher, orphaning the engine and leaving a stray Chrome behind. The
+        graceful shutdown above is the normal path; this is the fallback.
+        """
+        if not self.proc:
+            return
+        if sys.platform == "win32":
+            try:
+                subprocess.run(
+                    ["taskkill", "/PID", str(self.proc.pid), "/T", "/F"],
+                    capture_output=True,
+                    timeout=15,
+                    check=False,
+                )
+                return
+            except Exception:  # noqa: BLE001
+                pass
+        try:
+            self.proc.kill()
+        except Exception:  # noqa: BLE001
+            pass
+
     def stop(self) -> None:
         if not self.proc:
             return
@@ -180,7 +210,7 @@ class Workspace:
             pass
         finally:
             if self.proc.poll() is None:
-                self.proc.kill()
+                self._kill_tree()
             self.state = "stopped"
 
     def alive(self) -> bool:
@@ -259,6 +289,16 @@ class Workspace:
             return "\n".join(self.proc.stderr.read().strip().splitlines()[-lines:])
         except Exception:  # noqa: BLE001
             return ""
+
+    def job_list(self) -> list[dict]:
+        """Jobs this workspace has run, newest first.
+
+        Lets a client that lost its event stream — a reload, a network blip —
+        find the work it started instead of stranding on a spinner while the
+        result sits here in memory.
+        """
+        jobs = sorted(self.jobs.values(), key=lambda j: j.created_at, reverse=True)
+        return [j.snapshot(with_result=False) for j in jobs]
 
     def info(self) -> dict:
         return {

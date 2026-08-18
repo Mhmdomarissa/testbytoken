@@ -271,8 +271,10 @@ document.querySelectorAll('input[name=auth]').forEach(r =>
   }));
 
 // --- generic job stream ---------------------------------------------------
-function stream(jobId, box, onDone){
-  const es = new EventSource(API + "/uts/jobs/" + jobId + "/events");
+// since=0 replays everything buffered for the job, so reattaching after a
+// dropped connection loses nothing.
+function stream(jobId, box, onDone, since){
+  const es = new EventSource(API + "/uts/jobs/" + jobId + "/events?since=" + (since || 0));
   es.onmessage = ev => {
     const e = JSON.parse(ev.data);
     if (e.type === "log")            log(box, e.line);
@@ -491,11 +493,81 @@ function renderResult(snap, status){
   $("result").innerHTML = html;
 }
 
+// --- recovery -------------------------------------------------------------
+// A reload or a dropped stream used to strand this page on a spinner while the
+// answer sat in the backend. On load, reattach to whatever this session last
+// ran: replay it if it is still going, render it if it already finished.
+function applyScanResult(snap){
+  modules = (snap.result || {}).modules || [];
+  renderModules();
+  setStep("s1","done"); setStep("s2","done"); setStep("s3","active");
+}
+
+async function recover(){
+  if (!session) return;
+  let data;
+  try{
+    data = await (await fetch(API + "/uts/workspace/" + session + "/jobs")).json();
+  }catch(e){ return; }
+  const jobs = data.jobs || [];
+  if (!jobs.length) return;
+
+  const job = jobs[0];                       // newest first
+  const live = job.status === "running" || job.status === "queued"
+            || job.status === "awaiting_login";
+  const box = job.kind === "run" ? $("runLog")
+            : job.kind === "inspect" ? $("inspectLog") : $("scanLog");
+  if (job.kind === "inspect") box.style.display = "block";
+
+  // Point the UI at the step this job belongs to.
+  if (job.kind === "scan"){ setStep("s1","done"); setStep("s2","active"); scanJob = job.job_id; }
+  else { setStep("s1","done"); setStep("s2","done"); setStep("s3","active"); }
+  if (job.kind === "run"){ setStep("s3","done"); setStep("s4","active"); runJob = job.job_id; }
+
+  box.innerHTML = "";
+  log(box, "-- reattached to " + job.kind + " " + job.job_id + " (" + job.status + ")", "i");
+
+  if (live){
+    if (job.kind === "scan"){ $("scanBtn").disabled = true; $("scanBtn").textContent = "Scanning…"; }
+    if (job.kind === "run"){ $("runBtn").disabled = true; $("runBtn").textContent = "Running…"; }
+    stream(job.job_id, box, async status => {
+      $("scanBtn").disabled = false; $("scanBtn").textContent = "Scan my application";
+      $("runBtn").disabled = false;  $("runBtn").textContent = "Generate & run tests";
+      const snap = await (await fetch(API + "/uts/jobs/" + job.job_id)).json();
+      if (job.kind === "scan" && status === "done") applyScanResult(snap);
+      else if (job.kind === "run"){ setStep("s4","done"); setStep("s5","active"); renderResult(snap, status); }
+      else if (job.kind === "inspect" && status === "done") renderInventory(snap.result || {});
+    }, 0);
+    return;
+  }
+
+  // Already finished — render what it produced.
+  const snap = await (await fetch(API + "/uts/jobs/" + job.job_id)).json();
+  if (job.kind === "scan" && snap.status === "done") applyScanResult(snap);
+  else if (job.kind === "run"){ setStep("s4","done"); setStep("s5","active"); renderResult(snap, snap.status); }
+  else if (job.kind === "inspect" && snap.status === "done"){
+    // Restore the module list too, so the picker is usable again.
+    const prevScan = (data.jobs || []).find(j => j.kind === "scan" && j.status === "done");
+    if (prevScan && !modules.length){
+      const s = await (await fetch(API + "/uts/jobs/" + prevScan.job_id)).json();
+      applyScanResult(s);
+    }
+    renderInventory(snap.result || {});
+  }
+  if (snap.error) log(box, "ERROR " + snap.error, "e");
+}
+
 // boot
 fetch(API + "/uts/debug/workspaces").then(r => r.json())
   .then(d => pill($("enginePill"), "engine: " + (d.engine_available ? "ready" : "missing"),
                   d.engine_available ? "on" : ""))
   .catch(() => pill($("enginePill"), "engine: API down"));
+
+if (session){
+  pill($("wsPill"), "workspace: " + session.slice(0,8), "on");
+  pollWorkspace();
+  recover();
+}
 </script>
 </body>
 </html>

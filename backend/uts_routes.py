@@ -81,6 +81,20 @@ def workspace_status(session_id: str):
     return space.info()
 
 
+@router.get("/workspace/{session_id}/jobs")
+def workspace_jobs(session_id: str):
+    """Everything this session has run, newest first.
+
+    Read-only and deliberately does not create a workspace: a client calls this
+    on load to find work it lost track of, and asking "what did I run?" should
+    never boot an engine.
+    """
+    space = manager.get(session_id)
+    if not space:
+        return {"session_id": session_id, "jobs": [], "workspace": None}
+    return {"session_id": session_id, "jobs": space.job_list(), "workspace": space.info()}
+
+
 @router.post("/workspace/{session_id}/reset")
 def reset_workspace(session_id: str):
     """Kill whatever is running and bring a clean engine up under the same session."""

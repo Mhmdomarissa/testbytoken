@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -160,10 +161,47 @@ def _build_chrome_options(cfg: dict[str, Any]) -> ChromeOptions:
     return options
 
 
+def _cached_chromedriver() -> str:
+    """Path to a chromedriver we already have on disk, newest first.
+
+    Selenium Manager resolves the driver over the internet on *every* launch.
+    When that host is unreachable it spends ~87s timing out before falling back
+    to exactly the cached driver it could have used immediately — which turns a
+    3.5s pre-warm into a minute and a half, and makes the engine depend on
+    outbound internet it does not otherwise need.
+    """
+    explicit = (os.environ.get("UTS_CHROMEDRIVER") or "").strip()
+    if explicit and Path(explicit).is_file():
+        return explicit
+
+    cache = Path.home() / ".cache" / "selenium" / "chromedriver"
+    if not cache.is_dir():
+        return ""
+
+    def version_key(path: Path) -> tuple:
+        try:
+            return tuple(int(p) for p in path.parent.name.split("."))
+        except ValueError:
+            return (0,)
+
+    drivers = [p for p in cache.glob("*/*/chromedriver*") if p.is_file()]
+    if not drivers:
+        return ""
+    return str(sorted(drivers, key=version_key)[-1])
+
+
 def _create_chrome_driver(cfg: dict[str, Any]) -> webdriver.Chrome:
     options = _build_chrome_options(cfg)
 
-    # Prefer Selenium Manager (built into Selenium 4.6+) — no wdm lock issues
+    # A driver we already have beats a network lookup we might not be able to do.
+    cached = (cfg.get("chromedriver_path") or "").strip() or _cached_chromedriver()
+    if cached:
+        try:
+            return webdriver.Chrome(service=ChromeService(executable_path=cached), options=options)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Cached chromedriver unusable (%s), asking Selenium Manager", exc)
+
+    # Selenium Manager (built into Selenium 4.6+) — resolves/downloads a driver.
     try:
         return webdriver.Chrome(options=options)
     except Exception:  # noqa: BLE001
