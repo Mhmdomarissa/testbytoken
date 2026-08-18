@@ -324,6 +324,19 @@ def _module_flow_scenarios(
     slug = _slug(module)
     login = _login_steps(discovery, username, str(discovery.get('password') or ''))
 
+    # Resolved once, from buttons the crawl actually saw. Everything below asks
+    # these rather than assuming a page has Add/Save — a filter dropdown is not
+    # a data-entry form, and asserting on controls that are not there produces
+    # failures about our guesses instead of about the application.
+    def _button(*hints: str) -> dict[str, Any] | None:
+        return next(
+            (b for b in buttons if any(h in (b.get("label") or "").lower() for h in hints)),
+            None,
+        )
+
+    add_btn = _button("add", "new", "create")
+    save_btn = _button("save", "submit", "apply")
+
     # 1) Link / navigation smoke
     nav_steps = [dict(s) for s in login]
     n = len(nav_steps) + 1
@@ -371,7 +384,8 @@ def _module_flow_scenarios(
     )
 
     # 2) Enter / sendKeys / object fill + verify
-    if fields or "form_fill" in caps or "create" in caps:
+    # Only worth a data-entry test if the page offers a way to submit one.
+    if (save_btn or add_btn) and (fields or "form_fill" in caps or "create" in caps):
         fill_steps = [dict(s) for s in login]
         n = len(fill_steps) + 1
         fill_steps.append(
@@ -387,10 +401,6 @@ def _module_flow_scenarios(
             }
         )
         n += 1
-        add_btn = next(
-            (b for b in buttons if any(h in (b.get("label") or "").lower() for h in ("add", "new", "create"))),
-            None,
-        )
         if add_btn:
             fill_steps.append(
                 {
@@ -432,10 +442,6 @@ def _module_flow_scenarios(
             )
             n += 1
 
-        save_btn = next(
-            (b for b in buttons if any(h in (b.get("label") or "").lower() for h in ("save", "submit", "apply"))),
-            None,
-        )
         if save_btn:
             fill_steps.append(
                 {
@@ -450,7 +456,8 @@ def _module_flow_scenarios(
                 }
             )
             n += 1
-        if cfg.get("include_verification", True):
+        # A success toast only means something if we actually submitted.
+        if save_btn and cfg.get("include_verification", True):
             fill_steps.append(
                 {
                     "step_no": n,
@@ -489,7 +496,8 @@ def _module_flow_scenarios(
         scenarios.append(scenario)
 
     # 3) Negative verification
-    if cfg.get("include_negative", True) and fields:
+    # Submitting an empty form to check validation needs a real submit button.
+    if cfg.get("include_negative", True) and fields and save_btn:
         neg_steps = [dict(s) for s in login]
         n = len(neg_steps) + 1
         neg_steps.append(
@@ -505,10 +513,6 @@ def _module_flow_scenarios(
             }
         )
         n += 1
-        add_btn = next(
-            (b for b in buttons if any(h in (b.get("label") or "").lower() for h in ("add", "new", "create"))),
-            None,
-        )
         if add_btn:
             neg_steps.append(
                 {
@@ -523,10 +527,6 @@ def _module_flow_scenarios(
                 }
             )
             n += 1
-        save_btn = next(
-            (b for b in buttons if any(h in (b.get("label") or "").lower() for h in ("save", "submit"))),
-            {"label": "Save"},
-        )
         neg_steps.append(
             {
                 "step_no": n,
@@ -570,9 +570,10 @@ def _module_flow_scenarios(
             }
         )
 
-    # 4) Search if available
-    if "search" in caps or page.get("search_fields"):
-        search_label = (page.get("search_fields") or ["Search"])[0]
+    # 4) Search — only when the crawl actually found a search box.
+    if page.get("search_fields"):
+        search_label = page["search_fields"][0]
+        search_btn = _button("search", "find", "filter", "apply", "go")
         search_steps = [dict(s) for s in login]
         n = len(search_steps) + 1
         search_steps.extend(
@@ -597,27 +598,37 @@ def _module_flow_scenarios(
                     "expected": "",
                     "concept": "enter",
                 },
+            ]
+        )
+        n += 2
+        # Plenty of search boxes filter as you type and have no button at all.
+        # Only click one we actually saw.
+        if search_btn:
+            label = search_btn.get("label") or "Search"
+            search_steps.append(
                 {
-                    "step_no": n + 2,
+                    "step_no": n,
                     "action": "PerformClick",
-                    "object_name": "Search",
+                    "object_name": label,
                     "input_value": "",
                     "locator_by": "xpath",
-                    "locator_value": "//button[contains(normalize-space(.),'Search')]",
+                    "locator_value": f"//button[contains(normalize-space(.),'{label}')]",
                     "expected": "",
                     "concept": "click",
-                },
-                {
-                    "step_no": n + 3,
-                    "action": "Verify",
-                    "object_name": "Results",
-                    "input_value": module,
-                    "locator_by": "",
-                    "locator_value": "",
-                    "expected": "Search results displayed",
-                    "concept": "verification",
-                },
-            ]
+                }
+            )
+            n += 1
+        search_steps.append(
+            {
+                "step_no": n,
+                "action": "Verify",
+                "object_name": "Results",
+                "input_value": module,
+                "locator_by": "",
+                "locator_value": "",
+                "expected": "Search results displayed",
+                "concept": "verification",
+            }
         )
         scenarios.append(
             {
@@ -709,16 +720,32 @@ def offline_understand(
             }
         )
 
+    unread: list[str] = []
     for mod in modules:
-        page = page_by_module.get(mod) or {
-            "module": mod,
-            "fields": [],
-            "buttons": [{"label": "Add", "action": "UpdateRecord"}, {"label": "Save", "action": "UpdateRecord"}],
-            "capabilities": ["create", "form_fill", "search", "list_view"],
-            "search_fields": ["Search"],
-            "path": mod,
-        }
+        page = page_by_module.get(mod)
+        if not page or not page.get("understood"):
+            # No readable profile for this module. Previously we substituted an
+            # invented one — Add/Save buttons and a Search box that were never
+            # on the page — which generated tests guaranteed to fail on elements
+            # that do not exist. Generate only what we can stand behind.
+            unread.append(mod)
+            page = {
+                "module": mod,
+                "fields": [],
+                "buttons": [],
+                "capabilities": [],
+                "search_fields": [],
+                "path": mod,
+            }
         scenarios.extend(_module_flow_scenarios(mod, page, discovery, username, cfg))
+
+    if unread:
+        print(
+            "  NOTE: no page detail for "
+            + ", ".join(unread)
+            + " — navigation tests only. Open the module with 'Look inside' to "
+            "see whether the crawl can reach it."
+        )
 
     objects = build_object_repository(discovery, page_map) if cfg.get("generate_object_repo", True) else []
     return {
