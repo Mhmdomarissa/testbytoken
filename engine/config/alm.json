@@ -1,0 +1,8 @@
+{
+  "output_path": "alm-output",
+  "export_excel": true,
+  "export_xml": true,
+  "default_priority": "Medium",
+  "default_test_type": "Automated",
+  "default_status": "Design"
+}

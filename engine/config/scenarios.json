@@ -1,0 +1,43 @@
+{
+  "suite_name": "SMART BANK E2E Test Suite",
+  "total_scenarios": 5,
+  "manual_count": 2,
+  "automation_count": 3,
+  "scenarios": [
+    {
+      "id": "TC_MAN_01",
+      "type": "manual",
+      "title": "Login with valid credentials",
+      "priority": "High",
+      "file": "manual-tests/TC_MAN_01_login_valid_credentials.txt"
+    },
+    {
+      "id": "TC_MAN_02",
+      "type": "manual",
+      "title": "Transfer between self accounts - full flow",
+      "priority": "High",
+      "file": "manual-tests/TC_MAN_02_transfer_self_accounts.txt"
+    },
+    {
+      "id": "TC_AUTO_01",
+      "type": "automation",
+      "title": "Automated login validation",
+      "priority": "High",
+      "module": "automation.test_login"
+    },
+    {
+      "id": "TC_AUTO_02",
+      "type": "automation",
+      "title": "Navigate to Transfer Between My Accounts",
+      "priority": "High",
+      "module": "automation.test_navigation"
+    },
+    {
+      "id": "TC_AUTO_03",
+      "type": "automation",
+      "title": "Execute transfer flow end-to-end",
+      "priority": "Critical",
+      "module": "automation.test_transfer"
+    }
+  ]
+}

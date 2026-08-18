@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>UTS Console — first application test</title>
+<style>
+  :root{
+    --text:#161616; --text-soft:#6b6b6b; --bg:#ffffff; --bg-soft:#f7f7f5;
+    --line:#e3e1da; --yellow:#ffe600; --yellow-dark:#e6cf00;
+    --pass:#2e7d46; --fail:#c22a2a; --wait:#b0770f;
+    --mono:'SF Mono',Consolas,'Liberation Mono',monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --text:#f2f0e8; --text-soft:#a8a6a0; --bg:#1c1c1c; --bg-soft:#222222; --line:#333; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+  .wrap{max-width:1000px;margin:0 auto;padding:28px 20px 80px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;
+         padding-bottom:18px;border-bottom:2px solid var(--text);margin-bottom:26px;flex-wrap:wrap}
+  h1{font-size:21px;margin:0;letter-spacing:-.02em}
+  h1 small{display:block;font-size:12px;font-weight:400;color:var(--text-soft);letter-spacing:0;margin-top:3px}
+  .pill{font:600 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;
+        padding:7px 11px;border:1px solid var(--line);border-radius:999px;color:var(--text-soft);white-space:nowrap}
+  .pill.on{border-color:var(--pass);color:var(--pass)}
+  .pill.busy{border-color:var(--wait);color:var(--wait)}
+
+  .step{border:1px solid var(--line);border-radius:10px;margin-bottom:16px;overflow:hidden;
+        opacity:.45;transition:opacity .2s}
+  .step.active,.step.done{opacity:1}
+  .step-head{display:flex;align-items:center;gap:11px;padding:13px 16px;background:var(--bg-soft);
+             border-bottom:1px solid var(--line)}
+  .num{width:23px;height:23px;flex:0 0 23px;border-radius:50%;background:var(--text);color:var(--bg);
+       display:grid;place-items:center;font:700 12px/1 var(--mono)}
+  .step.done .num{background:var(--pass);color:#fff}
+  .step-head h2{font-size:14px;margin:0;font-weight:650;letter-spacing:-.01em}
+  .step-body{padding:16px}
+
+  label{display:block;font:600 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.07em;
+        color:var(--text-soft);margin:0 0 6px}
+  input[type=text],input[type=password]{width:100%;padding:10px 12px;border:1px solid var(--line);
+        border-radius:7px;background:var(--bg);color:var(--text);font-size:14px;font-family:inherit}
+  input:focus{outline:2px solid var(--yellow);outline-offset:-1px;border-color:transparent}
+  .row{display:grid;grid-template-columns:2fr 1fr;gap:13px;margin-bottom:13px}
+  .row.two{grid-template-columns:1fr 1fr}
+  @media(max-width:640px){.row,.row.two{grid-template-columns:1fr}}
+
+  button{font:600 13px/1 inherit;padding:11px 18px;border-radius:7px;border:1px solid var(--text);
+         background:var(--text);color:var(--bg);cursor:pointer}
+  button:hover:not(:disabled){background:var(--yellow);color:#161616;border-color:var(--yellow)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button.ghost{background:transparent;color:var(--text)}
+  button.big{padding:13px 24px;font-size:14px}
+
+  .auth{display:flex;gap:18px;margin:4px 0 14px;flex-wrap:wrap}
+  .auth label{display:flex;align-items:center;gap:7px;text-transform:none;letter-spacing:0;
+              font:400 13px/1.4 inherit;color:var(--text);cursor:pointer;margin:0}
+  .hint{font-size:12px;color:var(--text-soft);margin:8px 0 0}
+
+  .console{background:#111;color:#d6d3c8;font:12px/1.55 var(--mono);padding:12px 14px;border-radius:7px;
+           height:230px;overflow-y:auto;white-space:pre-wrap;word-break:break-word}
+  .console .s{color:var(--yellow)}
+  .console .e{color:#ff8a8a}
+  .console .i{color:#7fb5ff}
+
+  .banner{border:2px solid var(--wait);border-radius:9px;padding:16px;margin-bottom:14px;background:var(--bg-soft)}
+  .banner h3{margin:0 0 6px;font-size:15px;color:var(--wait)}
+  .banner p{margin:0 0 13px;font-size:13.5px}
+  .banner code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:2px 6px;border-radius:4px;
+               border:1px solid var(--line)}
+
+  .mods{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:9px;margin-bottom:15px}
+  .mod{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:7px;padding:10px 12px;cursor:pointer}
+  .mod:has(input:checked){border-color:var(--text);background:var(--bg-soft)}
+  .mod span{font-size:13.5px}
+  .mod em{font:400 11px/1 var(--mono);color:var(--text-soft);font-style:normal;margin-left:auto}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  th{text-align:left;font:600 10.5px/1 var(--mono);text-transform:uppercase;letter-spacing:.07em;
+     color:var(--text-soft);padding:8px 9px;border-bottom:1px solid var(--line)}
+  td{padding:9px;border-bottom:1px solid var(--line);vertical-align:top}
+  .tag{font:700 10px/1 var(--mono);padding:4px 7px;border-radius:4px;display:inline-block}
+  .tag.PASS{background:var(--pass);color:#fff}
+  .tag.FAIL{background:var(--fail);color:#fff}
+  .tag.SKIP{background:var(--line);color:var(--text-soft)}
+  .verdict{display:flex;align-items:center;gap:14px;padding:15px;border-radius:9px;
+           background:var(--bg-soft);border:1px solid var(--line);margin-bottom:15px;flex-wrap:wrap}
+  .verdict b{font-size:21px;letter-spacing:-.02em}
+  .verdict .k{font:600 10.5px/1 var(--mono);text-transform:uppercase;color:var(--text-soft);letter-spacing:.07em}
+  .verdict .v{font-size:14px;margin-top:3px}
+  details{margin-top:5px}
+  summary{cursor:pointer;font-size:12px;color:var(--text-soft)}
+  .err{color:var(--fail);font-size:13px;margin-top:9px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>UTS Console
+    <small>Second touchpoint &mdash; signed up, running their first application test</small></h1>
+  <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+    <span class="pill" id="wsPill">workspace: none</span>
+    <span class="pill" id="enginePill">engine: ?</span>
+    <button class="ghost" id="resetBtn" style="padding:7px 13px;font-size:12px"
+            title="Kill whatever is running and start a clean engine">Reset engine</button>
+  </div>
+</header>
+
+<!-- 1 ................................................................. -->
+<section class="step active" id="s1">
+  <div class="step-head"><div class="num">1</div><h2>Your application</h2></div>
+  <div class="step-body">
+    <div class="row">
+      <div><label for="url">Application URL</label>
+        <input type="text" id="url" placeholder="https://your-app.example.com" autocomplete="off" /></div>
+      <div><label for="appName">Name (optional)</label>
+        <input type="text" id="appName" placeholder="TimeSight" autocomplete="off" /></div>
+    </div>
+
+    <label>How should we get in?</label>
+    <div class="auth">
+      <label><input type="radio" name="auth" value="interactive" checked />
+        I&rsquo;ll sign in myself &mdash; handles OTP, 2FA, CAPTCHA, SSO</label>
+      <label><input type="radio" name="auth" value="form" />
+        Use a test account (simple username + password)</label>
+    </div>
+
+    <div id="formCreds" style="display:none">
+      <div class="row two">
+        <div><label for="user">Username</label>
+          <input type="text" id="user" autocomplete="off" /></div>
+        <div><label for="pass">Password</label>
+          <input type="password" id="pass" autocomplete="off" /></div>
+      </div>
+      <p class="hint">Dedicated test accounts only. Passed straight to your engine for one run &mdash;
+        not stored, not logged. For anything real, use the sign-in-yourself option.</p>
+    </div>
+
+    <button class="big" id="scanBtn">Scan my application</button>
+    <p class="hint" id="warmHint">Your engine starts the moment you begin typing, so this is instant.</p>
+    <div class="err" id="s1err"></div>
+  </div>
+</section>
+
+<!-- 2 ................................................................. -->
+<section class="step" id="s2">
+  <div class="step-head"><div class="num">2</div><h2>Discovering what your app is made of</h2></div>
+  <div class="step-body">
+    <div class="banner" id="loginBanner" style="display:none">
+      <h3>Waiting for you to sign in</h3>
+      <p>A Chrome window is open at <code id="loginUrl"></code>. Sign in there &mdash; password, OTP,
+         two&#8209;factor, CAPTCHA, whatever your app asks for &mdash; then come back and continue.
+         Nothing is captured while you type; we keep the session, never your credentials.</p>
+      <button id="continueBtn">I&rsquo;ve signed in &mdash; continue</button>
+    </div>
+    <div class="console" id="scanLog"></div>
+    <div class="err" id="s2err"></div>
+  </div>
+</section>
+
+<!-- 3 ................................................................. -->
+<section class="step" id="s3">
+  <div class="step-head"><div class="num">3</div><h2>Pick what to test</h2></div>
+  <div class="step-body">
+    <div class="mods" id="mods"></div>
+    <button class="ghost" id="allBtn">Select all</button>
+    <button class="big" id="runBtn">Generate &amp; run tests</button>
+    <p class="hint">Not sure what a module contains? Press <strong>Look inside</strong> on it &mdash;
+       we open that page and list every tab, link, button and field we find, without
+       clicking any of them.</p>
+    <div class="console" id="inspectLog" style="display:none;height:150px;margin-top:12px"></div>
+    <div id="inspectOut"></div>
+    <div class="err" id="s3err"></div>
+  </div>
+</section>
+
+<!-- 4 ................................................................. -->
+<section class="step" id="s4">
+  <div class="step-head"><div class="num">4</div><h2>Running</h2></div>
+  <div class="step-body"><div class="console" id="runLog"></div></div>
+</section>
+
+<!-- 5 ................................................................. -->
+<section class="step" id="s5">
+  <div class="step-head"><div class="num">5</div><h2>Result</h2></div>
+  <div class="step-body" id="result"></div>
+</section>
+
+</div>
+<script>
+const API = window.API_BASE || "http://localhost:8001";
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+let session = localStorage.getItem("uts_session") || "";
+let scanJob = null, runJob = null, modules = [], warmed = false;
+
+function pill(el, text, cls){ el.textContent = text; el.className = "pill" + (cls ? " " + cls : ""); }
+function setStep(id, state){
+  const el = $(id);
+  el.classList.remove("active","done");
+  if (state) el.classList.add(state);
+  if (state === "active") el.scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+function log(box, text, cls){
+  const d = document.createElement("div");
+  if (cls) d.className = cls;
+  d.textContent = text;               // engine output is never trusted as HTML
+  box.appendChild(d);
+  box.scrollTop = box.scrollHeight;
+}
+
+// --- workspace ------------------------------------------------------------
+async function warm(){
+  if (warmed) return;
+  warmed = true;
+  try{
+    const r = await fetch(API + "/uts/workspace", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({session_id: session || null})
+    });
+    const d = await r.json();
+    session = d.session_id;
+    localStorage.setItem("uts_session", session);
+    pill($("wsPill"), "workspace: " + session.slice(0,8), "on");
+    pollWorkspace();
+  }catch(e){
+    warmed = false;
+    pill($("wsPill"), "workspace: unreachable");
+    $("s1err").textContent = "Can't reach the engine API at " + API + ". Is the backend running?";
+  }
+}
+async function pollWorkspace(){
+  if (!session) return;
+  try{
+    const d = await (await fetch(API + "/uts/workspace/" + session)).json();
+    const busy = d.state === "busy";
+    pill($("enginePill"), "engine: " + d.state, busy ? "busy" : (d.state === "warm" ? "on" : ""));
+  }catch(e){ /* transient */ }
+  setTimeout(pollWorkspace, 3000);
+}
+$("url").addEventListener("input", warm, {once:true});
+$("appName").addEventListener("input", warm, {once:true});
+
+// Escape hatch: kill whatever the engine is doing and bring a clean one up.
+$("resetBtn").addEventListener("click", async () => {
+  if (!session){ await warm(); return; }
+  const btn = $("resetBtn");
+  btn.disabled = true; btn.textContent = "Resetting…";
+  try{
+    const r = await fetch(API + "/uts/workspace/" + session + "/reset", {method:"POST"});
+    if (!r.ok) throw new Error((await r.json()).detail || "Reset failed");
+    ["s1err","s2err","s3err"].forEach(id => $(id).textContent = "");
+    $("loginBanner").style.display = "none";
+    ["scanBtn","runBtn"].forEach(id => { $(id).disabled = false; });
+    $("scanBtn").textContent = "Scan my application";
+    $("runBtn").textContent = "Generate & run tests";
+    pill($("enginePill"), "engine: restarting", "busy");
+  }catch(e){ $("s1err").textContent = e.message; }
+  btn.disabled = false; btn.textContent = "Reset engine";
+});
+
+document.querySelectorAll('input[name=auth]').forEach(r =>
+  r.addEventListener("change", () => {
+    $("formCreds").style.display =
+      document.querySelector('input[name=auth]:checked').value === "form" ? "block" : "none";
+  }));
+
+// --- generic job stream ---------------------------------------------------
+function stream(jobId, box, onDone){
+  const es = new EventSource(API + "/uts/jobs/" + jobId + "/events");
+  es.onmessage = ev => {
+    const e = JSON.parse(ev.data);
+    if (e.type === "log")            log(box, e.line);
+    else if (e.type === "step")      log(box, "> " + e.message, "s");
+    else if (e.type === "status")    log(box, "-- " + e.state, "i");
+    else if (e.type === "error")     log(box, "ERROR " + e.message, "e");
+    else if (e.type === "awaiting_login"){
+      $("loginUrl").textContent = e.url || "";
+      $("loginBanner").style.display = "block";
+      log(box, "-- waiting for you to sign in", "i");
+    }
+    else if (e.type === "login_captured"){
+      $("loginBanner").style.display = "none";
+      log(box, "-- signed in; session captured (" + e.cookies + " cookies), crawling from "
+               + e.post_login_url, "s");
+    }
+    else if (e.type === "end"){ es.close(); onDone(e.status); }
+  };
+  es.onerror = () => { es.close(); onDone("error"); };
+}
+
+// --- step 2: scan ---------------------------------------------------------
+$("scanBtn").addEventListener("click", async () => {
+  const url = $("url").value.trim();
+  $("s1err").textContent = "";
+  if (!url){ $("s1err").textContent = "Add your application URL first."; return; }
+  await warm();
+  const interactive = document.querySelector('input[name=auth]:checked').value === "interactive";
+  $("scanBtn").disabled = true; $("scanBtn").textContent = "Scanning…";
+  $("scanLog").innerHTML = ""; $("s2err").textContent = "";
+  setStep("s1","done"); setStep("s2","active");
+  try{
+    const r = await fetch(API + "/uts/scan", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({session_id: session, url, app_name: $("appName").value.trim(),
+                            interactive, username: $("user").value, password: $("pass").value})
+    });
+    if (!r.ok) throw new Error((await r.json()).detail || "Scan failed to start");
+    scanJob = (await r.json()).job_id;
+    stream(scanJob, $("scanLog"), async status => {
+      $("scanBtn").disabled = false; $("scanBtn").textContent = "Scan my application";
+      const snap = await (await fetch(API + "/uts/jobs/" + scanJob)).json();
+      if (status !== "done"){ $("s2err").textContent = snap.error || "Scan did not finish."; return; }
+      modules = (snap.result || {}).modules || [];
+      renderModules();
+      setStep("s2","done"); setStep("s3","active");
+    });
+  }catch(e){
+    $("s2err").textContent = e.message;
+    $("scanBtn").disabled = false; $("scanBtn").textContent = "Scan my application";
+  }
+});
+
+$("continueBtn").addEventListener("click", async () => {
+  $("continueBtn").disabled = true;
+  try{
+    const r = await fetch(API + "/uts/jobs/" + scanJob + "/continue", {method:"POST"});
+    if (!r.ok) throw new Error((await r.json()).detail || "Could not resume");
+    $("loginBanner").style.display = "none";
+  }catch(e){ $("s2err").textContent = e.message; }
+  $("continueBtn").disabled = false;
+});
+
+// --- step 3: pick ---------------------------------------------------------
+function renderModules(){
+  if (!modules.length){
+    $("mods").innerHTML = "<p class='hint'>The crawl found no modules. That usually means it never "
+      + "got past the front door, or the app has no navigation the crawler recognises.</p>";
+    return;
+  }
+  $("mods").innerHTML = modules.map((m,i) =>
+    `<label class="mod"><input type="checkbox" value="${esc(m.name)}" ${i<3?"checked":""}/>
+       <span>${esc(m.name)}</span>
+       <button class="ghost inspect" data-mod="${esc(m.name)}"
+               style="margin-left:auto;padding:5px 9px;font-size:11px">Look inside</button></label>`).join("");
+  document.querySelectorAll(".inspect").forEach(b =>
+    b.addEventListener("click", e => { e.preventDefault(); inspectModule(b.dataset.mod); }));
+}
+
+// Open one module and list what is actually on it.
+function inspectModule(name){
+  const box = $("inspectLog");
+  box.style.display = "block"; box.innerHTML = "";
+  $("inspectOut").innerHTML = "";
+  $("s3err").textContent = "";
+  document.querySelectorAll(".inspect").forEach(b => b.disabled = true);
+  fetch(API + "/uts/inspect", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({session_id: session, url: $("url").value.trim(),
+                          app_name: $("appName").value.trim(),
+                          interactive: document.querySelector('input[name=auth]:checked').value === "interactive",
+                          username: $("user").value, password: $("pass").value, module: name})
+  }).then(async r => {
+    if (!r.ok) throw new Error((await r.json()).detail || "Inspect failed to start");
+    const jobId = (await r.json()).job_id;
+    stream(jobId, box, async () => {
+      document.querySelectorAll(".inspect").forEach(b => b.disabled = false);
+      const snap = await (await fetch(API + "/uts/jobs/" + jobId)).json();
+      if (snap.status === "error"){ $("s3err").textContent = snap.error || "Inspect failed."; return; }
+      renderInventory(snap.result || {});
+    });
+  }).catch(e => {
+    $("s3err").textContent = e.message;
+    document.querySelectorAll(".inspect").forEach(b => b.disabled = false);
+  });
+}
+
+function renderInventory(inv){
+  const groups = [["tabs","Tabs / sub-pages"],["links","Links"],["buttons","Action buttons"],
+                  ["inputs","Form fields"],["searches","Search & filter"]];
+  const total = groups.reduce((n,[k]) => n + ((inv[k]||[]).length), 0);
+  let html = `<div class="verdict" style="margin-top:14px">
+      <b>${esc(inv.module || "Page")}</b>
+      <div><div class="k">Opened</div><div class="v">${inv.opened ? "yes" : "no — inspected current page"}</div></div>
+      <div><div class="k">Things found</div><div class="v">${total}</div></div>
+      <div style="flex:1 1 100%"><div class="k">URL</div>
+           <div class="v" style="font-family:var(--mono);font-size:12px">${esc(inv.url)}</div></div>
+    </div>`;
+  if (inv.headings && inv.headings.length)
+    html += `<p class="hint"><strong>Headings:</strong> ${inv.headings.map(esc).join(" · ")}</p>`;
+  if (!total){
+    html += `<p class="hint">Nothing actionable found on that page. If the module needs another
+             click to open, or renders after a delay, that is the likely reason.</p>`;
+  }
+  for (const [key,label] of groups){
+    const items = inv[key] || [];
+    if (!items.length) continue;
+    html += `<table><thead><tr><th>${esc(label)} (${items.length})</th><th>Locator</th></tr></thead><tbody>`;
+    for (const it of items)
+      html += `<tr><td>${esc(it.label || "(unlabelled)")}${it.tag ? ` <em style="color:var(--text-soft)">${esc(it.tag)}</em>` : ""}</td>
+                   <td style="font-family:var(--mono);font-size:11px;color:var(--text-soft)">${esc(it.by)}=${esc(it.value)}</td></tr>`;
+    html += `</tbody></table>`;
+  }
+  $("inspectOut").innerHTML = html;
+}
+$("allBtn").addEventListener("click", () => {
+  const boxes = document.querySelectorAll("#mods input");
+  const on = [...boxes].some(b => !b.checked);
+  boxes.forEach(b => b.checked = on);
+});
+
+// --- step 4/5: run --------------------------------------------------------
+$("runBtn").addEventListener("click", async () => {
+  const picked = [...document.querySelectorAll("#mods input:checked")].map(b => b.value);
+  $("s3err").textContent = "";
+  if (!picked.length){ $("s3err").textContent = "Pick at least one module."; return; }
+  $("runBtn").disabled = true; $("runBtn").textContent = "Running…";
+  $("runLog").innerHTML = ""; $("result").innerHTML = "";
+  setStep("s3","done"); setStep("s4","active");
+  try{
+    const r = await fetch(API + "/uts/run", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({session_id: session, url: $("url").value.trim(),
+                            app_name: $("appName").value.trim(),
+                            interactive: document.querySelector('input[name=auth]:checked').value === "interactive",
+                            username: $("user").value, password: $("pass").value, modules: picked})
+    });
+    if (!r.ok) throw new Error((await r.json()).detail || "Run failed to start");
+    runJob = (await r.json()).job_id;
+    stream(runJob, $("runLog"), async status => {
+      $("runBtn").disabled = false; $("runBtn").textContent = "Generate & run tests";
+      const snap = await (await fetch(API + "/uts/jobs/" + runJob)).json();
+      setStep("s4","done"); setStep("s5","active");
+      renderResult(snap, status);
+    });
+  }catch(e){
+    $("s3err").textContent = e.message;
+    $("runBtn").disabled = false; $("runBtn").textContent = "Generate & run tests";
+  }
+});
+
+function renderResult(snap, status){
+  const data = snap.result || {};
+  const res  = data.results || {};
+  const sum  = res.summary || {};
+  const cases = res.automation || [];
+  const passed = sum.auto_pass ?? cases.filter(c => c.status === "PASS").length;
+  const failed = sum.auto_fail ?? cases.filter(c => c.status === "FAIL").length;
+  const verdict = status === "done" && failed === 0 && cases.length ? "PASS" : (cases.length ? "PARTIAL" : "NO RESULT");
+
+  let html = `<div class="verdict">
+      <b>${esc(verdict)}</b>
+      <div><div class="k">Test cases</div><div class="v">${cases.length}</div></div>
+      <div><div class="k">Passed</div><div class="v">${passed}</div></div>
+      <div><div class="k">Failed</div><div class="v">${failed}</div></div>
+      <div><div class="k">Duration</div><div class="v">${esc(sum.duration_sec ?? "—")}s</div></div>
+      <div><div class="k">Exit code</div><div class="v">${esc(data.exit_code)}</div></div>
+    </div>`;
+
+  if (snap.error) html += `<div class="err">${esc(snap.error)}</div>`;
+
+  if (cases.length){
+    html += `<table><thead><tr><th>Status</th><th>Test case</th><th>Steps</th><th>Detail</th></tr></thead><tbody>`;
+    for (const c of cases){
+      const steps = c.steps || [];
+      const stepRows = steps.map(s =>
+        `<tr><td><span class="tag ${esc(s.status)}">${esc(s.status)}</span></td>
+             <td>${esc(s.step_no)}. ${esc(s.action)} &mdash; ${esc(s.object_name)}</td>
+             <td>${esc(Math.round(s.duration_ms))} ms</td>
+             <td>${esc(s.message)}</td></tr>`).join("");
+      html += `<tr>
+          <td><span class="tag ${esc(c.status)}">${esc(c.status)}</span></td>
+          <td><strong>${esc(c.title || c.tc_id)}</strong><br>
+              <span class="k" style="font-family:var(--mono);font-size:11px;color:var(--text-soft)">${esc(c.tc_id)}</span></td>
+          <td>${steps.length}</td>
+          <td>${esc(c.error || "")}
+            ${steps.length ? `<details><summary>step detail</summary>
+              <table style="margin-top:8px">${stepRows}</table></details>` : ""}</td>
+        </tr>`;
+    }
+    html += `</tbody></table>`;
+  }
+  if (data.report_html)
+    html += `<p style="margin-top:16px"><a href="${API}/uts/jobs/${encodeURIComponent(runJob)}/report"
+             target="_blank">Open the engine's full HTML report &rarr;</a></p>`;
+  $("result").innerHTML = html;
+}
+
+// boot
+fetch(API + "/uts/debug/workspaces").then(r => r.json())
+  .then(d => pill($("enginePill"), "engine: " + (d.engine_available ? "ready" : "missing"),
+                  d.engine_available ? "on" : ""))
+  .catch(() => pill($("enginePill"), "engine: API down"));
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "application": "SMART BANK",
+  "environment": "DevEnv",
+  "credentials": {
+    "username": "admin_user",
+    "password": "Pass@123"
+  },
+  "transfer": {
+    "source_account": "Business Chequing",
+    "destination_account": "Personal Online Savings",
+    "amount": "1.20",
+    "transfer_date": "30 Jun 2026",
+    "frequency": "Once",
+    "message": "E2E test transfer"
+  }
+}

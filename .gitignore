@@ -4,3 +4,18 @@ __pycache__/
 shots/
 .env
 node_modules/
+
+# Per-user engine workspaces — run artifacts, screenshots, reports, exports.
+workspaces/
+
+# The engine writes here when UTS_WORKDIR is unset (single-user fallback).
+engine/generated/
+engine/reports/
+engine/logs/
+engine/manual-tests/
+engine/alm-output/
+engine/xpedite-output/
+engine/worker.env
+
+# Vendor runtime log — not code, and it carried client module names.
+engine/xpedite/generator_log.txt

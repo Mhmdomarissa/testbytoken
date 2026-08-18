@@ -1,0 +1,30 @@
+{
+  "_comment": "AI brain for URL → understand → generate objects / BDD / data-driven / verification",
+  "enabled": true,
+  "provider": "offline",
+  "_comment_provider": "offline (FREE) | openai | azure_openai | ollama | gemini | claude",
+  "model": "gpt-4o-mini",
+  "api_key_env": "UTS_AI_API_KEY",
+  "base_url": "",
+  "_comment_base_url": "offline needs no key. ollama: http://127.0.0.1:11434/v1",
+  "temperature": 0.2,
+  "max_tokens": 4000,
+  "generate_bdd": true,
+  "generate_object_repo": true,
+  "generate_data_driven": true,
+  "data_driven_rows": 3,
+  "include_negative": true,
+  "include_verification": true,
+  "concepts": [
+    "link",
+    "object",
+    "verification",
+    "enter",
+    "send_keys",
+    "data_driven",
+    "bdd",
+    "click",
+    "select",
+    "notification"
+  ]
+}
