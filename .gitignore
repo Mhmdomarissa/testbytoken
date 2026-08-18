@@ -19,3 +19,11 @@ engine/worker.env
 
 # Vendor runtime log — not code, and it carried client module names.
 engine/xpedite/generator_log.txt
+
+# Vendored UTS platform: run artifacts, not source. These carried a client's
+# module names, test cases and exports, and were stripped from history once.
+UTS testing/uts-platform/generated/
+UTS testing/uts-platform/alm-output/
+UTS testing/uts-platform/xpedite-output/
+UTS testing/uts-platform/reports/
+UTS testing/uts-platform/logs/
