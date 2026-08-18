@@ -30,21 +30,65 @@ The signup wall comes **after** step 4, not before. Deliver value first.
   full auditable trace + token cost. **Tested live against a real single-page app
   and passed 5/5.** Do not rewrite this; wrap it.
 - `backend/app.py` — FastAPI wrapper. `/plan` (LLM maps text→checks), `/run`
-  (executes the test), `/health`. Includes the free-tier safety guardrails.
-- `frontend/index.html` — single-file clickable demo of all four journey steps.
-  Talks to the backend over fetch.
+  (executes the test), `/health`. Serves screenshots read-only at `/shots`.
+  Free-tier safety guardrails included, with a local-demo bypass (see below).
+- `frontend/index.html` — the full customer-facing homepage ("Proof — Testing
+  as a Service"), built July 2026 in the approved design language
+  (`design_handoff_adr_website/DESIGN_LANGUAGE.md`): nav, hero, stats bar,
+  about split, service cards, four-step tiles, CTA band, footer. The hero
+  embeds the live test launcher — all four journey steps work end to end,
+  including the proof screen with screenshot and trace hash. Desktop-only for
+  now; photos are Unsplash placeholders.
+
+## Running it locally
+
+Two processes (or use `.claude/launch.json`, which defines both):
+
+```
+cd backend && python -m uvicorn app:app --port 8001     # the engine API
+python -m http.server 5500 --directory frontend          # the homepage
+```
+
+Then open http://localhost:5500. The frontend expects the API at
+`http://localhost:8001` (override with `window.API_BASE`). If the backend
+isn't running, the launcher says so and shows the start command.
+
+**Local demo mode:** `TAAS_LOCAL_DEMO` (default `1`) lifts the target
+guardrail so you can test anything from your own laptop — localhost, private
+IPs, bare domains (auto-prefixed `https://`), even local HTML files
+(`C:\path\to\page.html` is converted to a `file:///` URL). `/plan` drops the
+HTTPS check for non-https targets so local runs aren't guaranteed a failed
+step. **Set `TAAS_LOCAL_DEMO=0` before any public deployment** — that
+re-enables `is_allowed_target()` and blocks `file://` targets.
+
+**Free-text test requests (the "what would you like to test?" box):** the
+planner turns plain English into concrete checks. If `ANTHROPIC_API_KEY` is set,
+Claude maps the request; otherwise (or if that call fails) a built-in
+**keyword planner** handles it, so the box works out of the box with no key.
+Example: *"test all the buttons and make sure all the links work"* →
+`page_load`, `links_work`, `buttons_present`.
+
+**Supported checks** (`SUPPORTED_CHECKS` in `app.py`, executed by `runner.py`):
+`page_load`, `title`, `https`, `login_present`, `performance`, plus two
+content checks:
+- `links_work` — collects every anchor on the rendered page and HTTP-checks each
+  one (read-only HEAD/GET, capped at 25); fails if any return ≥ 400 or are
+  unreachable.
+- `buttons_present` — enumerates all `button` / button-role elements and confirms
+  they render and are visible + enabled (clickable). It does **not** click them —
+  clicking arbitrary buttons could submit forms or trigger writes, which the
+  free tier forbids.
 
 ## Your build tasks, in order
 
-1. **Get the backend running locally.** See `docs/SETUP.md`. Confirm `/health`,
-   then `/run` against a public URL returns a PASS.
-2. **Serve screenshots.** Right now `runner.py` writes PNGs to a `shots/` dir but
-   the frontend can't see them. Add a static route (e.g. mount `/shots`) OR change
-   the runner to return the screenshot as base64 in the JSON. Wire the frontend
-   `#shot` image to display it. (Marked as a TODO in `frontend/index.html`.)
+1. ~~**Get the backend running locally.**~~ DONE — `/health` OK, `/run`
+   returns PASS with trace hash + tokens.
+2. ~~**Serve screenshots.**~~ DONE — mounted at `/shots`, `shot_url` added per
+   step after hashing, rendered in the proof screen.
 3. **Stream the run live** (nice-to-have). Right now `/run` is one blocking call.
    Upgrade to server-sent events / websocket so steps tick green in real time —
-   that's what makes step 3 feel alive. Ship the blocking version first.
+   that's what makes step 3 feel alive. (Designed in detail as B1 in
+   `bug_fixes.md` — build it in that shape.)
 4. **Add the signup wall** after the proof screen. Stub it — email capture only.
 5. **Stub the credentials vault UI.** Do NOT build real crypto yet. Read
    `docs/CREDENTIALS.md` — it explains the pattern and what NOT to do.
@@ -58,10 +102,16 @@ The signup wall comes **after** step 4, not before. Deliver value first.
   feature. See `docs/CREDENTIALS.md`.
 - **Keep the free-tier target guardrails** in `app.py` (`is_allowed_target`). They
   block internal/private hosts so the demo can't be used to attack infrastructure.
+  The `TAAS_LOCAL_DEMO` bypass exists for single-laptop demos ONLY — it must be
+  `0` on anything reachable by other people. (Guardrail hardening beyond the
+  string check is A3 in `bug_fixes.md`.)
 - **Read-only checks only** on the free path. No form submissions, no writes.
 - **One disposable browser context per run.** Never share state between runs.
 
 ## Architecture context (the bigger picture)
+
+The product roadmap — access ladder through Rung 4, growth funnel to
+enterprise handoff — is in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 This demo is Phase 1 of a larger platform (enterprise + self-serve lanes, token
 billing, a swappable engine that can route to legacy-system test tools). You don't

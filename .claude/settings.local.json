@@ -9,7 +9,11 @@
       "PowerShell(pip install anthropic --quiet)",
       "PowerShell(python -c \"import anthropic; print\\('anthropic ok'\\)\")",
       "PowerShell(python \"C:\\\\Users\\\\HP\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-HP-Desktop-Test-by-Token\\\\241b9af7-697a-420b-894f-d6ea5c549fb0\\\\scratchpad\\\\shot_filetest.py\")",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8001/docs)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8001/docs)",
+      "Bash(.venv/Scripts/python.exe -c \"import playwright; print\\('ok'\\)\")",
+      "Bash(.venv/Scripts/python.exe -m playwright --version)",
+      "Bash(.venv/Scripts/python.exe -c \"import anthropic, pydantic, fastapi, uvicorn; print\\('deps ok'\\)\")",
+      "Bash(curl -s -X POST http://localhost:8001/plan -H \"Content-Type: application/json\" -d '{\"url\":\"example.com\",\"quick_pick\":\"page_load\"}')"
     ]
   }
 }

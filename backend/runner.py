@@ -30,7 +30,8 @@ def run_test(target_url: str, checks: list[str] | None = None, shots_dir: str = 
     Run a test against target_url.
 
     checks: list of check ids to run. Supported: "page_load", "title",
-            "https", "login_present", "performance". Defaults to a safe read-only set.
+            "https", "login_present", "performance", "links_work",
+            "buttons_present". Defaults to a safe read-only set.
     Returns: the full run dict (trace + metrics). Also writes screenshots to shots_dir.
     """
     if checks is None:
@@ -116,6 +117,94 @@ def run_test(target_url: str, checks: list[str] | None = None, shots_dir: str = 
                 )
                 return f"responseEnd ~{t}ms" if t else "timing unavailable"
             step("Capture load performance", perf)
+
+        # "make sure all the links work": collect every anchor on the rendered
+        # page and HTTP-check each one. Read-only (HEAD/GET, no navigation away),
+        # bounded to LINK_LIMIT so a link-heavy page can't run forever. A link is
+        # "broken" if it errors or returns >= 400. Fragment-only and non-http
+        # schemes (mailto:, tel:, javascript:) are skipped — they aren't fetchable.
+        if "links_work" in checks:
+            LINK_LIMIT = 25
+            def links_check():
+                hrefs = page.eval_on_selector_all(
+                    "a[href]", "els => els.map(e => e.href)"
+                )
+                seen, keys = [], set()
+                for h in hrefs:
+                    if not h or h.startswith(("mailto:", "tel:", "javascript:")):
+                        continue
+                    if not h.startswith(("http://", "https://")):
+                        continue
+                    key = h.split("#")[0]  # ignore fragment for dedupe
+                    if key in keys:
+                        continue
+                    keys.add(key)
+                    seen.append(h)
+                checked = seen[:LINK_LIMIT]
+                broken = []
+                for h in checked:
+                    try:
+                        resp = page.request.head(h, timeout=8000)
+                        status = resp.status
+                        if status >= 400 or status == 0:
+                            # some servers reject HEAD — retry with GET before failing
+                            resp = page.request.get(h, timeout=8000)
+                            status = resp.status
+                        if status >= 400:
+                            broken.append(f"{status} {h}")
+                    except Exception:
+                        broken.append(f"unreachable {h}")
+                run["links_found"] = len(seen)
+                run["links_checked"] = len(checked)
+                run["links_broken"] = broken
+                assert not broken, (
+                    f"{len(broken)} broken link(s): " + "; ".join(broken[:5])
+                    + (" …" if len(broken) > 5 else "")
+                )
+                note = f"{len(checked)} link(s) checked, all resolved"
+                if len(seen) > LINK_LIMIT:
+                    note = f"{len(checked)} of {len(seen)} links checked (capped), all resolved"
+                return note
+            step("All links resolve", links_check)
+
+        # "test all the buttons": enumerate every button / button-role element and
+        # confirm they render and are actionable (visible + enabled). This stays
+        # read-only on purpose — we do NOT click them, because clicking arbitrary
+        # buttons on a stranger's site could submit forms or trigger writes, which
+        # the free tier forbids. We verify the buttons are present and clickable.
+        if "buttons_present" in checks:
+            def buttons_check():
+                loc = page.locator(
+                    "button, input[type='button'], input[type='submit'], [role='button']"
+                )
+                total = loc.count()
+                assert total > 0, "no buttons or button-role elements found on the page"
+                visible = enabled = 0
+                labels = []
+                for i in range(min(total, 50)):
+                    el = loc.nth(i)
+                    try:
+                        if not el.is_visible():
+                            continue
+                        visible += 1
+                        if el.is_enabled():
+                            enabled += 1
+                        txt = (
+                            el.inner_text().strip()
+                            or (el.get_attribute("value") or "").strip()
+                            or (el.get_attribute("aria-label") or "").strip()
+                        )
+                        if txt and len(labels) < 6:
+                            labels.append(txt[:28])
+                    except Exception:
+                        pass
+                run["buttons_found"] = total
+                run["buttons_visible"] = visible
+                run["buttons_enabled"] = enabled
+                assert visible > 0, f"{total} button(s) in DOM but none visible"
+                sample = (" — e.g. " + ", ".join(labels)) if labels else ""
+                return f"{total} button(s); {visible} visible, {enabled} clickable{sample}"
+            step("Buttons present & clickable", buttons_check)
 
         browser.close()
 
