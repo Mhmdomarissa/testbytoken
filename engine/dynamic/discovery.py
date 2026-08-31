@@ -1222,6 +1222,10 @@ def discover_application(
         wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
 
     post_login_url = driver.current_url
+    try:
+        wait.until(lambda d: len(_find_nav_links(d)) > 0)
+    except Exception:  # noqa: BLE001
+        pass  # genuinely empty app — fall through with zero modules
     headings = _find_headings(driver)
     nav_links = _find_nav_links(driver)
     form_fields = _find_form_fields(driver)
