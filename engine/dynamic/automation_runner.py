@@ -553,8 +553,15 @@ def run_all_automation(
                         logger.info("Automation stopped by user after failure — skipping retry")
                         break
                     raise
-                logger.info(f"{scenario.id} failed — fresh login and retry explore scenario once")
-                prepare_fresh_session(discovery, password, logger, role_hint=role_hint)
+                # Only re-login if we can actually log back in. On a session the
+                # customer supplied interactively there are no credentials, so a
+                # "fresh session" here signs us out for good and every later
+                # scenario runs against the login page.
+                if logout_after_each:
+                    logger.info(f"{scenario.id} failed — fresh login and retry explore scenario once")
+                    prepare_fresh_session(discovery, password, logger, role_hint=role_hint)
+                else:
+                    logger.info(f"{scenario.id} failed — retrying once on the current session")
                 retry = run_scenario(
                     scenario, discovery, password, logger, fresh_login_before=False, role_hint=role_hint
                 )

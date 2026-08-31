@@ -40,7 +40,13 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from automation.base import ExecutionLogger
-from automation.selenium_session import get_driver, quit_driver, shutdown_all, start_browser
+from automation.selenium_session import (
+    get_driver,
+    has_session,
+    quit_driver,
+    shutdown_all,
+    start_browser,
+)
 from dynamic.automation_runner import run_all_automation, save_discovery
 from dynamic.discovery import AUTOMATION_TYPES, discover_application
 from dynamic.module_selector import (
@@ -136,7 +142,8 @@ def scan_modules_to_json(inp: dict):
     actions_path = save_actions_catalog()
     save_discovery(discovery)
     alm_out = export_modules_catalog_to_alm(modules, app_name=app_name, url=url)
-    quit_driver()
+    if not has_session():
+        quit_driver()
 
     print()
     print(f"  Modules scanned: {len(modules)}")
@@ -250,7 +257,13 @@ def create_and_run(
         print(f"    - {s.id}: {tag}{s.title}")
     print(f"  Saved: {flow_path}")
     print()
-    quit_driver()
+    # Closing here forces a relaunch before the automation phase. With
+    # credentials that is harmless — we log back in. On a session the customer
+    # handed us interactively it is not: the replayed cookie snapshot may no
+    # longer be accepted, and the window visibly disappears mid-run. Keep the
+    # browser we already have.
+    if not has_session():
+        quit_driver()
 
     print("  ALM + XPEDITE EXPORT")
     print("-" * 68)
