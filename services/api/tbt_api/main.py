@@ -43,9 +43,9 @@ app.include_router(uts_router)
 
 @app.on_event("shutdown")
 def _stop_workspaces():
-    from tbt_api.engines.uts_workspace import manager
+    from tbt_api.engines.base import UtsEngine
 
-    manager.shutdown_all()
+    UtsEngine().shutdown_all()
 
 # Screenshots: the runner writes PNGs here; we expose them read-only at /shots so
 # the frontend can display them. Ensure the dir exists before mounting.
