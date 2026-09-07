@@ -16,14 +16,14 @@ not the same codebase, and it matters which one you are touching.
 | What | Testing-as-a-Service demo: paste a URL, describe a test in plain English, a real browser runs it and returns an auditable proof | An existing Flask + Selenium test-automation platform the company already runs on a VPS |
 | Lives in | `backend/`, `frontend/`, `engine/` | `UTS testing/uts-platform/` (vendored copy) |
 | Stack | Python + FastAPI + Playwright, plain HTML/CSS/JS front end | Python + Flask + Selenium + SQLite |
-| Read first | [`README.md`](README.md) | [`UTS testing/README.md`](UTS%20testing/README.md) |
+| Read first | [`README.md`](../README.md) | [`UTS testing/README.md`](../reference/README.md) |
 
 The current work — and the branch you will check out — is **joining them**:
 making the UTS engine the thing that actually runs customer tests, one warm
 engine workspace per user, with an interactive login so a customer can clear
 MFA/SSO without ever handing over a password.
 
-That plan is [`docs/UTS_INTEGRATION_PLAN.md`](docs/UTS_INTEGRATION_PLAN.md).
+That plan is [`docs/UTS_INTEGRATION_PLAN.md`](UTS_INTEGRATION_PLAN.md).
 **Read it before writing any code** — it explains which half of UTS is being
 kept and, more importantly, which half is deliberately being thrown away.
 
@@ -144,7 +144,7 @@ cd engine && python -m pip install -r requirements.txt && python run_automation_
 
 `uts-platform/` ships `RUN-WEB.bat` and `run-web.sh`, which build a venv and
 start it against local SQLite. See the "How to run it locally" section of
-[`UTS testing/README.md`](UTS%20testing/README.md) — including the one known
+[`UTS testing/README.md`](../reference/README.md) — including the one known
 blocker (`run_web.py` is missing a `sys.path.insert`, with the fix written out).
 
 ---

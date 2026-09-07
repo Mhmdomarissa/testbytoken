@@ -2,7 +2,7 @@
 
 > **Status: PLAN, nothing implemented.** Written 17 Aug 2026 after a full read of
 > both codebases. This document supersedes the "Decision gate" section of
-> [`bug_fixes.md`](../bug_fixes.md) — the owner has now cemented **Model 2,
+> [`bug_fixes.md`](bug_fixes.md) — the owner has now cemented **Model 2,
 > hosted container**, and specifically *one container per user*. Every B-item in
 > that backlog is therefore unblocked.
 

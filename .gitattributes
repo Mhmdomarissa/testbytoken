@@ -1,6 +1,6 @@
 # The captured connector is committed as evidence: it must keep its original
 # LF-only line endings, which are the reason cmd.exe cannot run it.
-"UTS testing/UTS-Connect-JackTest.bat" -text
+"reference/UTS-Connect-JackTest.bat" -text
 
 # A Windows .bat must be CRLF or cmd.exe mis-parses it. Pin it on checkout.
-"UTS testing/UTS-Connect-JackTest-FIXED.bat" text eol=crlf
+"reference/UTS-Connect-JackTest-FIXED.bat" text eol=crlf
