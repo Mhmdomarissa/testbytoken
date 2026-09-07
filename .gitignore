@@ -9,16 +9,16 @@ node_modules/
 workspaces/
 
 # The engine writes here when UTS_WORKDIR is unset (single-user fallback).
-engine/generated/
-engine/reports/
-engine/logs/
-engine/manual-tests/
-engine/alm-output/
-engine/xpedite-output/
-engine/worker.env
+services/engine/generated/
+services/engine/reports/
+services/engine/logs/
+services/engine/manual-tests/
+services/engine/alm-output/
+services/engine/xpedite-output/
+services/engine/worker.env
 
 # Vendor runtime log — not code, and it carried client module names.
-engine/xpedite/generator_log.txt
+services/engine/uts_engine/exporters/xpedite/generator_log.txt
 
 # Vendored UTS platform: run artifacts, not source. These carried a client's
 # module names, test cases and exports, and were stripped from history once.
