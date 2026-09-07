@@ -26,7 +26,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
-from workspaces import manager
+from tbt_api.engines.uts_workspace import manager
 
 router = APIRouter(prefix="/uts", tags=["uts"])
 

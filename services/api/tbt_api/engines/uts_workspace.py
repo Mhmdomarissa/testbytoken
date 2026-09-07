@@ -1,6 +1,6 @@
-"""workspaces.py — one UTS engine per user.
+"""uts_workspace.py — one UTS engine per user.
 
-A workspace is a long-lived engine_host.py process with its own working
+A workspace is a long-lived uts_engine.host process with its own working
 directory. It is created the moment a customer starts typing, so Chrome is
 already up by the time they hit enter, and it is reaped once they go idle.
 
@@ -23,12 +23,15 @@ import time
 import uuid
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-ENGINE_ROOT = REPO_ROOT / "engine"
-ENGINE_HOST = ENGINE_ROOT / "engine_host.py"
+# Repo root — five levels above this file (services/api/tbt_api/engines/).
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
+ENGINE_ROOT = REPO_ROOT / "services" / "engine"
+ENGINE_HOST = ENGINE_ROOT / "uts_engine" / "host.py"
 
-# The engine has its own venv (Selenium), kept separate from the API's venv
-# (FastAPI + Playwright) so the two browser stacks never share a process.
+# The engine (Selenium) and the API (FastAPI + Playwright) keep permanently
+# separate virtualenvs — services/engine/.venv vs services/api/.venv — so the
+# two browser stacks never share a process. Never point ENGINE_PYTHON at the
+# API's own venv, and never import engine code into this process directly.
 ENGINE_PYTHON = ENGINE_ROOT / ".venv" / "Scripts" / "python.exe"
 if not ENGINE_PYTHON.is_file():
     ENGINE_PYTHON = ENGINE_ROOT / ".venv" / "bin" / "python"
