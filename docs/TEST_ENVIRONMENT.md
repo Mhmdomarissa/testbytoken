@@ -7,17 +7,16 @@ can get past MFA without ever handing us a password.
 
 ## Start it
 
-Two processes. Both are defined in `.claude/launch.json`.
+Two processes, both one `make` command away from the repo root (or use
+`.claude/launch.json`, which defines both):
 
 ```bash
-cd backend && .venv/Scripts/python.exe -m uvicorn app:app --port 8001
+make setup-api setup-engine   # first time only
+make api                       # port 8001
+make web                        # port 5500
 ```
 
-```bash
-python -m http.server 5500 --directory frontend
-```
-
-Then open **<http://localhost:5500/uts-console.html>**.
+Then open **<http://localhost:5500/console.html>**.
 
 The homepage (`index.html`) is untouched and still runs the original Playwright
 checks. The console is a separate, deliberately plain page — the click-through
@@ -55,6 +54,9 @@ reset             POST   /uts/workspace/{id}/reset   kill a wedged run, clean en
 teardown          DELETE /uts/workspace/{id}
 debug             GET    /uts/debug/workspaces
 ```
+
+All of this is implemented in `services/api/tbt_api/routes/uts.py`, backed by
+`services/api/tbt_api/engines/uts_workspace.py`.
 
 ### Reset engine
 
@@ -106,12 +108,12 @@ Four separate defects stacked up; all four are fixed.
 
 ### 1. Race on the browser singleton — the `data:,` root cause
 
-`automation/selenium_session.py` keeps `_driver` as a module global, reached from
-both the pre-warm thread and the job thread with **no synchronisation**. The
-event order in the log (`busy` → `warming` → `warm`) shows both running at once:
-the job navigated one driver while the warm thread created another, and the
-un-navigated one — sitting on Chrome's `data:,` startup page — is what discovery
-crawled.
+`services/engine/uts_engine/automation/selenium_session.py` keeps `_driver` as
+a module global, reached from both the pre-warm thread and the job thread with
+**no synchronisation**. The event order in the log (`busy` → `warming` →
+`warm`) shows both running at once: the job navigated one driver while the warm
+thread created another, and the un-navigated one — sitting on Chrome's `data:,`
+startup page — is what discovery crawled.
 
 **Fixed.** An `RLock` now serialises every create/replace/quit, `quit_driver()`
 is split so the locked path cannot deadlock, and `EngineHost.warm()` refuses to
@@ -122,8 +124,9 @@ warm while a job holds the browser.
 `login_handoff` returned `driver.current_url` unconditionally, so `data:,`
 propagated into discovery as the target URL.
 
-**Fixed.** `engine_host._real_url()` rejects `data:,`, `about:blank` and
-`chrome://newtab/`, falling back to the URL the customer actually asked for.
+**Fixed.** `services/engine/uts_engine/host.py`'s `_real_url()` rejects `data:,`,
+`about:blank` and `chrome://newtab/`, falling back to the URL the customer
+actually asked for.
 
 ### 3. Signing out between tests destroyed the captured session
 
@@ -140,13 +143,15 @@ does not exist.
 
 One failed click on `Inbox` took **122 seconds**.
 
-`dynamic/automation_runner.py:121 _find_element()` tries a cascade of locator
-strategies, and a **5s implicit wait** was charged on every miss in that cascade,
-on top of the explicit `WebDriverWait(12)`. Mixing implicit and explicit waits is
-a known Selenium anti-pattern; this is the textbook symptom.
+`services/engine/uts_engine/discovery/automation_runner.py:121 _find_element()`
+tries a cascade of locator strategies, and a **5s implicit wait** was charged
+on every miss in that cascade, on top of the explicit `WebDriverWait(12)`.
+Mixing implicit and explicit waits is a known Selenium anti-pattern; this is
+the textbook symptom.
 
-**Fixed.** `config/selenium.json` now pins `implicit_wait_seconds: 0` with a
-comment explaining why it must stay there. Explicit waits do the waiting.
+**Fixed.** `services/engine/config/selenium.json` now pins
+`implicit_wait_seconds: 0` with a comment explaining why it must stay there.
+Explicit waits do the waiting.
 
 ## Still open
 
@@ -156,14 +161,18 @@ comment explaining why it must stay there. Explicit waits do the waiting.
 5. FAIL  Verify  PostLogin  'DemoBank' not found on page — continuing
 ```
 
-`dynamic/ai_brain.py:275` generates a post-login verification whose expected
-value is `discovery.app_name` — the label the *customer typed into our form*. Any
-app that does not happen to print that exact string fails this step. The same
-pattern produced `Verify Home = 'timehseet extractor'` against TimeSight,
-including the customer's own typo.
+`services/engine/uts_engine/planning/ai_brain.py` generated a post-login
+verification whose expected value was `discovery.app_name` — the label the
+*customer typed into our form*. Any app that does not happen to print that
+exact string failed this step. The same pattern produced
+`Verify Home = 'timehseet extractor'` against TimeSight, including the
+customer's own typo.
 
-It needs to assert on something the crawl actually observed — a heading, a URL
-change, the absence of the login form — not on our own label.
+> Note (service-split pass): the current `ai_brain.py` now derives this from
+> `_observed_marker()` — the crawled page title, or the post-login URL's host
+> — instead of `app_name`, with a comment recording exactly this history. If
+> you're touching this code, verify whether this item is actually still open
+> before assuming the description above is current.
 
 ## Known gaps
 
@@ -175,9 +184,9 @@ change, the absence of the login form — not on our own label.
   on their own machine. The hosted version needs the noVNC pane from Phase C.
 - **One run per workspace at a time**, enforced deliberately — one browser per
   user.
-- **ALM/Xpedite exporters still ship** in `engine/`. They are dead weight for
-  this product and should be dropped; they are now wrapped in try/except so an
-  export failure can no longer kill a customer's run.
-- **`engine/config/app-input.json`** still carries another application's
-  defaults. Nothing reads it — `engine_host._build_input()` builds the input in
-  memory — but it should go.
+- **ALM/Xpedite exporters still ship** in `services/engine/uts_engine/exporters/`.
+  They are dead weight for this product and should be dropped; they are now
+  wrapped in try/except so an export failure can no longer kill a customer's run.
+- **`services/engine/config/app-input.json`** still carries another
+  application's defaults. Nothing reads it — `uts_engine.host`'s
+  `_build_input()` builds the input in memory — but it should go.
