@@ -1,17 +1,17 @@
 {
-  "_comment": "This is a REAL result from runner.py against a live SPA. Use it as the contract for the JSON shape your frontend consumes. Note the SPA redirected to /login.",
+  "_comment": "This was a REAL result from runner.py against a live customer SPA; the target URL and page title below have been replaced with generic placeholders (was the same real client product already flagged in bug_fixes.md C4 and removed from index.html's launcher default). Use it as the contract for the JSON shape your frontend consumes. Note the SPA redirected to /login.",
   "run_id": "run_20260621063642",
-  "target": "https://alphacv.alphadatarecruitment.ae/",
+  "target": "https://example.com/",
   "engine": "Playwright / Chromium (real browser)",
   "started_utc": "2026-06-21T06:36:42.643437+00:00",
   "steps": [
     { "name": "Page loads + app renders", "status": "pass", "detail": "HTTP 200", "ms": 5240, "shot": "./shots/run_20260621063642_load.png" },
-    { "name": "Page has a title", "status": "pass", "detail": "title = 'Alpha CV - AI-Powered Resume Matching'", "ms": 2, "shot": null },
-    { "name": "Served over HTTPS", "status": "pass", "detail": "served over HTTPS (https://alphacv.alphadatarecruitment.ae/login?from=%2F)", "ms": 0, "shot": null },
+    { "name": "Page has a title", "status": "pass", "detail": "title = the customer's app", "ms": 2, "shot": null },
+    { "name": "Served over HTTPS", "status": "pass", "detail": "served over HTTPS (https://example.com/login?from=%2F)", "ms": 0, "shot": null },
     { "name": "Login interface present", "status": "pass", "detail": "2 auth element(s); keyword match=True", "ms": 27, "shot": null },
     { "name": "Capture load performance", "status": "pass", "detail": "responseEnd ~1315ms", "ms": 4, "shot": null }
   ],
-  "page_title": "Alpha CV - AI-Powered Resume Matching",
+  "page_title": "the customer's app",
   "finished_utc": "2026-06-21T06:36:49.357908+00:00",
   "steps_passed": 5,
   "steps_total": 5,

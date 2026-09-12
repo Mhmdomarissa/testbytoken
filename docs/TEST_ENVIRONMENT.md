@@ -96,10 +96,10 @@ Each user's artifacts land in `workspaces/<session>/` — `generated/`, `reports
 
 The full chain was proven against the bundled demo fixture:
 `TC_AI_LINK_Transfers`, 7 steps, 6 pass / 1 fail, with per-step action, status,
-message and duration coming back through the API. TimeSight itself still needs a
-real login, which is what the handoff is for.
+message and duration coming back through the API. The customer's app itself
+still needs a real login, which is what the handoff is for.
 
-## Fixed after the first live run against TimeSight
+## Fixed after the first live run against the customer's app
 
 The first real run generated and executed its whole suite against a **blank
 tab**. Every test case read `Navigate — Application URL = 'data:,'`, the crawl
@@ -164,9 +164,10 @@ Explicit waits do the waiting.
 `services/engine/uts_engine/planning/ai_brain.py` generated a post-login
 verification whose expected value was `discovery.app_name` — the label the
 *customer typed into our form*. Any app that does not happen to print that
-exact string failed this step. The same pattern produced
-`Verify Home = 'timehseet extractor'` against TimeSight, including the
-customer's own typo.
+exact string failed this step. The same pattern produced the same failure
+against the customer's app — the asserted value was even lifted verbatim
+from a typo the customer had made typing their own app's name into the
+form.
 
 > Note (service-split pass): the current `ai_brain.py` now derives this from
 > `_observed_marker()` — the crawled page title, or the post-login URL's host
