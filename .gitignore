@@ -36,3 +36,7 @@ reference/uts-platform/logs/
 # UTS_APP_PASSWORD env vars instead of editing this file. Template lives at
 # services/engine/config/app-input.example.json — copy it to get started.
 services/engine/config/app-input.json
+
+# Phase 0 before/after baseline artifacts — evidence, not source. make clean
+# doesn't touch this (unlike services/engine/generated|reports|alm-output).
+_baselines/
