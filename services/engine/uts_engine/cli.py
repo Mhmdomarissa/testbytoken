@@ -270,6 +270,10 @@ def create_and_run(
     print("  ALM + XPEDITE EXPORT")
     print("-" * 68)
     # Exports are a side deliverable — never let one fail a customer's test run.
+    # alm_out/xpedite_out are referenced unconditionally further down, so a
+    # skipped export must still leave them defined.
+    alm_out = None
+    xpedite_out = None
     try:
         alm_out = export_discovery_to_alm(discovery, scenarios_filter=selected)
         print(f"  ALM:     {alm_out}")

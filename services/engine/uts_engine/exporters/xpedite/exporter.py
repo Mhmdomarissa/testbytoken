@@ -472,9 +472,8 @@ def _load_xpedite_generator(converter_path: Path):
     """Load Xpedite XML generator — bundled copy first, optional external path second."""
     import importlib.util
 
-    candidates: list[Path] = [
-        ROOT / "xpedite" / "generator_engine.py",
-    ]
+    bundled = ROOT / "uts_engine" / "exporters" / "xpedite" / "generator_engine.py"
+    candidates: list[Path] = [bundled]
     if converter_path.is_dir():
         candidates.append(converter_path / "generator.py")
 
@@ -482,7 +481,7 @@ def _load_xpedite_generator(converter_path: Path):
     if gen_path is None:
         raise FileNotFoundError(
             "Xpedite generator not found. Expected bundled file at "
-            f"{ROOT / 'xpedite' / 'generator_engine.py'}. "
+            f"{bundled}. "
             "Optional: set converter_dynamic_path in config/xpedite.json "
             "to a folder containing generator.py."
         )
