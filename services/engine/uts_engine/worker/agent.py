@@ -92,7 +92,7 @@ def _progress(server: str, token: str, job_id: int, message: str) -> bool:
 
 
 def _run_job(job: dict, server: str, token: str) -> tuple[str, str, int]:
-    from uts_engine.automation.selenium_session import set_browser, shutdown_all, start_browser
+    from uts_engine.automation.selenium_session import safe_logout_after_each, set_browser, shutdown_all, start_browser
     from uts_engine.cli import create_and_run, scan_modules_to_json
     from uts_engine.job_control import JobStopped, clear_stop, is_stop_requested, request_stop
 
@@ -181,7 +181,7 @@ def _run_job(job: dict, server: str, token: str) -> tuple[str, str, int]:
                 discovery,
                 project.get("app_password") or inp.get("password") or "",
                 logger,
-                logout_after_each=True,
+                logout_after_each=safe_logout_after_each(True),
                 continue_on_failure=True,
                 role_hint=project.get("app_role") or "",
                 run_test_cases_only=[s.id for s in scenarios],

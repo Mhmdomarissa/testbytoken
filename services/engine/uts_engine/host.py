@@ -457,7 +457,7 @@ class EngineHost:
         self.warm()
 
     def run(self, job: str, cmd: dict) -> None:
-        from uts_engine.automation.selenium_session import has_session
+        from uts_engine.automation.selenium_session import has_session, safe_logout_after_each
         from uts_engine.cli import create_and_run
 
         modules = [m for m in (cmd.get("modules") or []) if str(m).strip()]
@@ -476,9 +476,7 @@ class EngineHost:
             role=cmd.get("role", ""),
             modules=modules,
             run_automation=True,
-            # Only safe to sign out between tests when we hold credentials to
-            # sign back in with.
-            logout_after_each=not has_session(),
+            logout_after_each=safe_logout_after_each(True),
         )
 
         def on_step(message: str) -> None:

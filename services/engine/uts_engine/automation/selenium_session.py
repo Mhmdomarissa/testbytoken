@@ -414,6 +414,17 @@ def has_session() -> bool:
     return bool(_session_bundle and _session_bundle.get("cookies"))
 
 
+def safe_logout_after_each(configured: bool) -> bool:
+    """Only safe to sign out between test cases when we hold credentials to
+    sign back in with. A customer-supplied interactive session has none —
+    logging out mid-run signs us out for good and strands every later
+    scenario on the login page. Every entry path that runs automation
+    (host.py, cli.py's create_and_run, worker/agent.py) must gate through
+    this rather than each re-deriving it — one call site's `and not
+    has_session()` forgotten is the whole bug back."""
+    return configured and not has_session()
+
+
 def restore_session(driver: webdriver.Remote) -> bool:
     """Re-inject the captured session into a fresh driver. Best effort."""
     bundle = _session_bundle

@@ -46,6 +46,7 @@ from uts_engine.automation.selenium_session import (
     get_driver,
     has_session,
     quit_driver,
+    safe_logout_after_each,
     shutdown_all,
     start_browser,
 )
@@ -201,7 +202,11 @@ def create_and_run(
     password = inp["password"]
     app_name = inp.get("app_name") or url.split("//")[-1].split("/")[0]
     role_hint = (inp.get("role") or "").strip()
-    logout_after_each = inp.get("logout_after_each_test", True)
+    # Gated here, in the shared function every entry path converges on,
+    # rather than trusting each caller to remember: host.py already
+    # pre-computes this correctly into inp, so this is a no-op for that
+    # path and a real fix for the CLI's own direct app-input.json path.
+    logout_after_each = safe_logout_after_each(inp.get("logout_after_each_test", True))
     started = time.perf_counter()
 
     use_ai = bool(inp.get("ai_mode") or inp.get("use_ai"))
