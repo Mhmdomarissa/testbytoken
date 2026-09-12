@@ -245,7 +245,6 @@ def create_and_run(
             page_map=page_map,
             modules=selected,
             username=username,
-            replace_scenarios=True,
         )
         print(f"  AI: {plan.get('summary')}")
         print(f"  AI provider: {plan.get('provider')}")

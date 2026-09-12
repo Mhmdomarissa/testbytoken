@@ -181,7 +181,7 @@ def apply_ai_plan_to_discovery(
     page_map: dict[str, Any] | None,
     modules: list[str],
     username: str,
-    replace_scenarios: bool = True,
+    replace_scenarios: bool = False,
 ) -> dict[str, Any]:
     """
     Run AI understand, write artifacts, merge scenarios into discovery.

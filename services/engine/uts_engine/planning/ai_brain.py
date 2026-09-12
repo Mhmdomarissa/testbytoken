@@ -128,21 +128,24 @@ def build_object_repository(
             key = f"{module}:{label}".lower()
             if key in seen:
                 continue
+            f_by = field.get("locator_by") or ""
+            f_val = field.get("locator_value") or ""
+            if not (f_by and f_val):
+                # D5: page-map field carries no real locator (older map, or
+                # the crawl genuinely couldn't identify one) — skip rather
+                # than invent a matches-every-input XPath.
+                continue
             seen.add(key)
             objects.append(
                 {
                     "name": label,
                     "concept": "object",
-                    "locator_by": "xpath",
-                    "locator_value": (
-                        f"//*[self::input or self::textarea or self::select]"
-                        f"[contains(@placeholder,'{label}') or contains(@name,'{label}') "
-                        f"or @id='{label}']"
-                    ),
+                    "locator_by": f_by,
+                    "locator_value": f_val,
                     "page": path,
                     "module": module,
                     "field_type": field.get("type") or field.get("tag") or "text",
-                    "stable_score": 50,
+                    "stable_score": 80 if f_by in {"id", "name"} else 55,
                 }
             )
         for btn in page.get("buttons") or []:
@@ -449,6 +452,12 @@ def _module_flow_scenarios(
         data_row: dict[str, str] = {}
         for field in fields[:8]:
             label = field.get("label") or "Field"
+            f_by = field.get("locator_by") or ""
+            f_val = field.get("locator_value") or ""
+            if not (f_by and f_val):
+                # D5: no real locator captured for this field — do not
+                # invent a matches-every-input XPath, just skip it.
+                continue
             ftype = field.get("type") or field.get("tag") or "text"
             value = _sample_value(label, ftype, 1)
             data_row[label] = value
@@ -461,11 +470,8 @@ def _module_flow_scenarios(
                     "action": action,
                     "object_name": label,
                     "input_value": f"{{{{{label}}}}}" if cfg.get("generate_data_driven") else value,
-                    "locator_by": "xpath",
-                    "locator_value": (
-                        f"//*[self::input or self::textarea or self::select]"
-                        f"[contains(@placeholder,'{label}') or contains(@name,'{label}')]"
-                    ),
+                    "locator_by": f_by,
+                    "locator_value": f_val,
                     "expected": "",
                     "concept": "send_keys" if action != "PerformSelect" else "select",
                 }
@@ -596,9 +602,16 @@ def _module_flow_scenarios(
             }
         )
 
-    # 4) Search — only when the crawl actually found a search box.
-    if page.get("search_fields"):
-        search_label = page["search_fields"][0]
+    # 4) Search — only when the crawl actually found a search box with a
+    # real locator (D2/D5: page-map search_fields are dicts now, not bare
+    # label strings — an entry with no locator has nothing checkable to
+    # click into, so it's treated the same as no search box at all).
+    search_field_candidates = [
+        sf for sf in (page.get("search_fields") or []) if sf.get("locator_by") and sf.get("locator_value")
+    ]
+    if search_field_candidates:
+        search_field = search_field_candidates[0]
+        search_label = search_field.get("label") or "Search"
         search_btn = _button("search", "find", "filter", "apply", "go")
         search_steps = [dict(s) for s in login]
         n = len(search_steps) + 1
@@ -619,8 +632,8 @@ def _module_flow_scenarios(
                     "action": "SetText",
                     "object_name": search_label,
                     "input_value": "{{SearchTerm}}",
-                    "locator_by": "xpath",
-                    "locator_value": f"//input[contains(@placeholder,'{search_label}') or contains(@name,'search')]",
+                    "locator_by": search_field["locator_by"],
+                    "locator_value": search_field["locator_value"],
                     "expected": "",
                     "concept": "enter",
                 },

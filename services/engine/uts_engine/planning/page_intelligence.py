@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from datetime import datetime
@@ -14,6 +15,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from uts_engine.discovery.discovery import (
     _attr,
+    _best_locator,
     _click_by_locator,
     _find_action_buttons,
     _find_form_fields,
@@ -32,6 +34,19 @@ GENERATED_DIR = data_root() / "generated"
 REPORTS_DIR = data_root() / "reports"
 PAGE_MAP_FILE = GENERATED_DIR / "page-map.json"
 PAGE_MAP_HTML = REPORTS_DIR / "app-page-map.html"
+
+# Bumped whenever the page-map element schema changes (e.g. D2's locator
+# capture) so downstream consumers can tell an old cached map apart from one
+# that actually carries locators.
+PAGE_MAP_VERSION = 2
+
+
+def _stable_element_id(module: str, path: str, role: str, label: str, locator_by: str, locator_value: str) -> str:
+    """Content hash of (module, page path, role, label, locator) — survives
+    re-crawls as long as the element itself hasn't materially changed,
+    unlike an index into the page's field/button list."""
+    raw = "|".join([module, path, role, label, locator_by, locator_value])
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
 
 
 def _infer_page_type(
@@ -98,16 +113,40 @@ def _analyze_current_page_inner(
     action_buttons = _find_action_buttons(driver, limit=20)
     search_fields = _find_search_fields(driver, limit=5)
 
+    path = module if not sub_page else f"{module} > {sub_page}"
+
     fields_out = []
     for label, tag, el in form_fields:
         field_type = _attr(el, "type") or tag
-        fields_out.append({"label": label, "type": field_type, "tag": tag})
+        _, loc_by, loc_val = _best_locator(el)
+        fields_out.append({
+            "id": _stable_element_id(module, path, "field", label, loc_by, loc_val),
+            "label": label,
+            "type": field_type,
+            "tag": tag,
+            "locator_by": loc_by,
+            "locator_value": loc_val,
+        })
 
     buttons_out = []
     for label, el in action_buttons:
+        _, loc_by, loc_val = _best_locator(el)
         buttons_out.append({
+            "id": _stable_element_id(module, path, "button", label, loc_by, loc_val),
             "label": label,
             "action": infer_action_from_button(label),
+            "locator_by": loc_by,
+            "locator_value": loc_val,
+        })
+
+    search_fields_out = []
+    for label, el in search_fields:
+        _, loc_by, loc_val = _best_locator(el)
+        search_fields_out.append({
+            "id": _stable_element_id(module, path, "search", label, loc_by, loc_val),
+            "label": label,
+            "locator_by": loc_by,
+            "locator_value": loc_val,
         })
 
     tables = driver.find_elements(By.CSS_SELECTOR, ".oxd-table-body, table tbody")
@@ -139,7 +178,6 @@ def _analyze_current_page_inner(
     if has_table:
         capabilities.append("list_view")
 
-    path = module if not sub_page else f"{module} > {sub_page}"
     return {
         "module": module,
         "sub_page": sub_page or "(main)",
@@ -153,7 +191,7 @@ def _analyze_current_page_inner(
         "fields": fields_out[:15],
         "button_count": len(buttons_out),
         "buttons": buttons_out[:15],
-        "search_fields": [label for label, _ in search_fields],
+        "search_fields": search_fields_out[:5],
         "table_rows": row_count,
         "capabilities": capabilities,
         "understood": bool(
@@ -308,6 +346,7 @@ def save_page_map(
         modules_seen.setdefault(mod, []).append(p)
 
     payload = {
+        "page_map_version": PAGE_MAP_VERSION,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "app_name": app_name,
         "url": url,
