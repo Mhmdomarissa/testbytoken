@@ -184,16 +184,10 @@ def _find_element(step: StepDef, locators: dict[str, dict[str, str]], timeout: i
         except Exception:  # noqa: BLE001
             pass
 
-    for loc in locators.values():
-        if not isinstance(loc, dict):
-            continue
-        by = BY_MAP.get(loc.get("by", ""), By.ID)
-        try:
-            el = driver.find_element(by, loc["value"])
-            if _visible(el):
-                return el
-        except Exception:  # noqa: BLE001
-            continue
+    # No any-locator sweep here (E2): walking every locator in the repository
+    # and returning the first visible match let a step meant for one control
+    # silently bind to and "succeed" against an unrelated one. An unresolved
+    # element is a real None — the caller must FAIL and say what it looked for.
     return None
 
 
@@ -347,7 +341,14 @@ def _execute_step(
 
         el = _find_element(step, locators)
         if el is None:
-            return _skip_or_fail(step, f"'{step.object_name}' not found — continuing")
+            locator_desc = (
+                f"{step.locator_by}={step.locator_value}" if step.locator_by and step.locator_value
+                else "(no locator on this step, text-match fallback also failed)"
+            )
+            return _skip_or_fail(
+                step,
+                f"'{step.object_name}' not found — tried locator {locator_desc}",
+            )
 
         if action in ("updaterecord", "deleterecord", "approval", "filterdata"):
             action = "performclick"
