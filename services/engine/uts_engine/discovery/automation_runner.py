@@ -203,6 +203,10 @@ def _is_critical_step(step: StepDef) -> bool:
     obj = step.object_name.lower()
     if action == "navigate":
         return True
+    # A verify/notification that finds nothing checked nothing — it must be
+    # able to FAIL the test case, not quietly SKIP into a PASS (E1).
+    if action in {"verify", "notification"}:
+        return True
     if any(h in obj for h in ("password", "username", "user name", "login", "sign in", "signin")):
         return True
     if action == "performselect" and obj == "role":
@@ -267,7 +271,12 @@ def _execute_step(
                 login_url = locators.get("_login_url", "")
                 if login_url and driver.current_url != login_url:
                     return True, f"URL changed to {driver.current_url}"
-                return _skip_or_fail(step, f"Login verification uncertain — on {driver.current_url}")
+                return _skip_or_fail(
+                    step,
+                    "Expected to have left the login screen after signing in "
+                    f"(no password field, or a URL change from {login_url or '(unknown login url)'}); "
+                    f"still on {driver.current_url}",
+                )
 
             if "search result" in obj_lower:
                 rows = driver.find_elements(By.CSS_SELECTOR, ".oxd-table-body .oxd-table-row, table tbody tr")
@@ -276,7 +285,11 @@ def _execute_step(
                 page_text = driver.find_element(By.TAG_NAME, "body").text.lower()
                 if "no records" in page_text or "no data" in page_text:
                     return True, "Search completed — no records found"
-                return _skip_or_fail(step, "Search results not confirmed — continuing")
+                return _skip_or_fail(
+                    step,
+                    "Expected result rows (.oxd-table-body .oxd-table-row / table tbody tr) or a "
+                    "'no records'/'no data' message; page body contained neither",
+                )
 
             if "module complete" in obj_lower or "functional flow completed" in (step.expected or "").lower():
                 module_hint = (step.input_value or step.object_name or "").lower()
@@ -290,7 +303,11 @@ def _execute_step(
                 toast_text = " ".join((t.text or "") for t in toasts).lower()
                 if any(w in toast_text for w in ("success", "saved", "updated", "created")):
                     return True, "Success notification shown"
-                return _skip_or_fail(step, f"Module flow verification soft-pass on {driver.current_url}")
+                return _skip_or_fail(
+                    step,
+                    f"Expected '{module_hint or '(no module hint)'}' in the URL or page body, or a "
+                    f"success/saved/updated/created toast; found none of those on {driver.current_url}",
+                )
 
             if step.input_value and step.input_value.startswith("http"):
                 return True, f"Current URL: {driver.current_url}"
@@ -308,7 +325,11 @@ def _execute_step(
                 return True, f"Verified page context for '{expected}'"
             if any(t in url for t in tokens):
                 return True, f"URL indicates '{expected}': {driver.current_url}"
-            return _skip_or_fail(step, f"'{expected}' not found on page — continuing")
+            return _skip_or_fail(
+                step,
+                f"Expected '{expected}' in the page title/headings/URL/body; "
+                f"found title+headings=\"{page_text.strip()[:120]}\", url={driver.current_url}",
+            )
 
         if action == "notification":
             toast_selectors = ".oxd-toast, .oxd-toast-content, [role='alert'], .toast"
@@ -318,7 +339,11 @@ def _execute_step(
             combined = (toast_text + " " + driver.find_element(By.TAG_NAME, "body").text).lower()
             if expected in combined or any(w in combined for w in ("success", "saved", "updated", "created")):
                 return True, f"Notification verified: {toast_text.strip() or expected}"
-            return _skip_or_fail(step, f"Notification not found: {expected}")
+            return _skip_or_fail(
+                step,
+                f"Expected a toast/notification containing '{expected}'; "
+                f"found: {toast_text.strip() or '(no toast text visible)'}",
+            )
 
         el = _find_element(step, locators)
         if el is None:
@@ -451,12 +476,18 @@ def run_scenario(
         )
 
     failed = [s for s in steps_results if s.status == "FAIL"]
-    # Clicks that were soft-skipped must not count as a full PASS
+    # Clicks that were soft-skipped must not count as a full PASS. verify/
+    # notification are already critical via _is_critical_step (so a real
+    # SKIP: from them means _skip_or_fail already downgraded ok=False, i.e.
+    # they show up in `failed` above, not here) — listed anyway as
+    # belt-and-braces for any other path that can still emit a bare SKIP
+    # status for one of these two actions.
     skipped_required = [
         s
         for s in steps_results
         if s.status == "SKIP"
-        and str(s.action).lower() in {"performclick", "click", "settext", "setpassword", "performselect"}
+        and str(s.action).lower()
+        in {"performclick", "click", "settext", "setpassword", "performselect", "verify", "notification"}
     ]
     status = "FAIL" if failed or skipped_required else "PASS"
     ended = datetime.now()
