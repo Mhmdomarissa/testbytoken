@@ -606,7 +606,25 @@ def run_all_automation(
 
         needs_fresh_login = scenario.id != "TC_AUTO_01" and not _is_login_scenario(scenario)
         if needs_fresh_login and logout_after_each:
-            prepare_fresh_session(discovery, password, logger, role_hint=role_hint)
+            if not prepare_fresh_session(discovery, password, logger, role_hint=role_hint):
+                # Logout could not be confirmed, or the re-login failed. Do
+                # NOT run this scenario as though it started clean — that is
+                # exactly the failure mode D8 exists to catch (E1/E3's
+                # disease: a check that silently passes because nobody
+                # verified the precondition it depends on).
+                logger.fail(f"{scenario.id}: session reset could not be confirmed — skipping")
+                results.append(
+                    TestResult(
+                        tc_id=scenario.id,
+                        title=scenario.title,
+                        test_type="automation",
+                        status="FAIL",
+                        error="Session reset could not be confirmed (logout/re-login not verified) before this scenario started",
+                        started_at=datetime.now().isoformat(timespec="seconds"),
+                        ended_at=datetime.now().isoformat(timespec="seconds"),
+                    )
+                )
+                continue
 
         try:
             result = run_scenario(
@@ -635,19 +653,23 @@ def run_all_automation(
                 # customer supplied interactively there are no credentials, so a
                 # "fresh session" here signs us out for good and every later
                 # scenario runs against the login page.
+                skip_retry = False
                 if logout_after_each:
                     logger.info(f"{scenario.id} failed — fresh login and retry explore scenario once")
-                    prepare_fresh_session(discovery, password, logger, role_hint=role_hint)
+                    if not prepare_fresh_session(discovery, password, logger, role_hint=role_hint):
+                        logger.fail(f"{scenario.id}: session reset could not be confirmed before retry — skipping retry")
+                        skip_retry = True
                 else:
                     logger.info(f"{scenario.id} failed — retrying once on the current session")
-                retry = run_scenario(
-                    scenario, discovery, password, logger, fresh_login_before=False, role_hint=role_hint
-                )
-                if retry.status == "PASS":
-                    logger.info(f"{scenario.id} retry succeeded")
-                    result = retry
-                else:
-                    logger.info(f"{scenario.id} retry also failed — moving to next scenario (no halt)")
+                if not skip_retry:
+                    retry = run_scenario(
+                        scenario, discovery, password, logger, fresh_login_before=False, role_hint=role_hint
+                    )
+                    if retry.status == "PASS":
+                        logger.info(f"{scenario.id} retry succeeded")
+                        result = retry
+                    else:
+                        logger.info(f"{scenario.id} retry also failed — moving to next scenario (no halt)")
 
             results.append(result)
             logger.info(f"Completed {scenario.id} => {result.status}")

@@ -30,10 +30,20 @@ class FakeElement:
 class FakeDriver:
     """current_url / title are plain attributes, matching real WebDriver."""
 
-    def __init__(self, current_url: str = "http://example.test/page", title: str = "Test Page"):
+    def __init__(
+        self,
+        current_url: str = "http://example.test/page",
+        title: str = "Test Page",
+        still_authenticated_redirect: tuple[str, str] | None = None,
+    ):
+        """still_authenticated_redirect=(login_url, dashboard_url): simulates
+        an app that, while a session is still live, bounces a navigation to
+        login_url straight to dashboard_url instead — the OrangeHRM-shaped
+        case a logout must actually clear, not just attempt."""
         self.current_url = current_url
         self.title = title
         self._registry: dict[tuple[str, str], list[FakeElement]] = {}
+        self._still_authenticated_redirect = still_authenticated_redirect
 
     def register(self, by: str, value: str, elements: list[FakeElement]) -> None:
         self._registry[(by, value)] = elements
@@ -49,3 +59,14 @@ class FakeDriver:
 
     def execute_script(self, script: str, *args):
         return None
+
+    def get(self, url: str) -> None:
+        if self._still_authenticated_redirect:
+            login_url, dashboard_url = self._still_authenticated_redirect
+            if url.split("?")[0].rstrip("/") == login_url.split("?")[0].rstrip("/"):
+                self.current_url = dashboard_url
+                return
+        self.current_url = url
+
+    def delete_all_cookies(self) -> None:
+        pass
