@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import sys
 import time
@@ -303,11 +302,8 @@ def create_and_run(
         print('    app-input.json me  "run_automation": true  karo')
         print("    phir SAME RUN.bat dubara chalao")
         print("=" * 68)
-        if open_outputs:
-            try:
-                os.startfile(str(xpedite_out))  # noqa: S606
-            except Exception:
-                webbrowser.open(xpedite_out.resolve().as_uri())
+        if open_outputs and xpedite_out is not None:
+            webbrowser.open(xpedite_out.resolve().as_uri())
         return 0
 
     print()
@@ -368,9 +364,7 @@ def create_and_run(
     print("=" * 68)
 
     if open_outputs:
-        try:
-            os.startfile(str(xpedite_out))  # noqa: S606
-        except Exception:
+        if xpedite_out is not None:
             webbrowser.open(xpedite_out.resolve().as_uri())
         webbrowser.open(latest.resolve().as_uri())
     return 1 if failed else 0
