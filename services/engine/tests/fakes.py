@@ -26,6 +26,15 @@ class FakeElement:
     def get_attribute(self, name: str):
         return self._attrs.get(name)
 
+    def clear(self) -> None:
+        self.text = ""
+
+    def send_keys(self, value: str) -> None:
+        self.text = value
+
+    def click(self) -> None:
+        pass
+
 
 class FakeDriver:
     """current_url / title are plain attributes, matching real WebDriver."""
@@ -58,6 +67,11 @@ class FakeDriver:
         return list(self._registry.get((by, value)) or [])
 
     def execute_script(self, script: str, *args):
+        # _execute_step's PerformClick handler polls this via WebDriverWait
+        # after every click; without it, every click blocks for the full
+        # real timeout (10s) waiting for a readyState that never comes.
+        if "readyState" in script:
+            return "complete"
         return None
 
     def get(self, url: str) -> None:

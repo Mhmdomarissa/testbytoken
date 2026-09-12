@@ -226,6 +226,11 @@ def _row_count_satisfies(count: int, spec: str) -> bool:
     return count == num
 
 
+# Shared with _is_login_step() below — one vocabulary for "this object is
+# part of a login form", not two that can drift apart.
+LOGIN_OBJECT_HINTS = ("password", "username", "user name", "login", "sign in", "signin")
+
+
 def _is_critical_step(step: StepDef) -> bool:
     """Login/navigation/explicit clicks must not be silently skipped as PASS."""
     action = step.action.lower()
@@ -236,7 +241,7 @@ def _is_critical_step(step: StepDef) -> bool:
     # able to FAIL the test case, not quietly SKIP into a PASS (E1).
     if action in {"verify", "notification"}:
         return True
-    if any(h in obj for h in ("password", "username", "user name", "login", "sign in", "signin")):
+    if any(h in obj for h in LOGIN_OBJECT_HINTS):
         return True
     if action == "performselect" and obj == "role":
         return True
@@ -459,6 +464,75 @@ def _is_login_scenario(scenario: ScenarioDef) -> bool:
     return scenario.id == "TC_AUTO_01"
 
 
+def _is_login_step(step: StepDef) -> bool:
+    """A step that's part of the embedded login sequence every generated
+    scenario (other than a pure login scenario) starts with — same hint
+    vocabulary _is_critical_step already uses to recognize username/
+    password/login-shaped objects, not a second one that can drift."""
+    action = step.action.lower()
+    obj = step.object_name.lower()
+    if action == "navigate":
+        return True
+    return any(h in obj for h in LOGIN_OBJECT_HINTS)
+
+
+def _login_step_prefix_end(steps: list[StepDef]) -> int:
+    """Index (exclusive) of the end of the embedded login-step prefix — the
+    contiguous run of login-shaped steps from the start of the scenario. 0
+    if the scenario doesn't start with one."""
+    end = 0
+    for step in steps:
+        if _is_login_step(step):
+            end += 1
+        else:
+            break
+    return end
+
+
+def _check_auth_state(discovery: DiscoveryResult) -> tuple[bool, str]:
+    """Is the app currently authenticated? Reuses the W3 assertion
+    primitives (url_matches / element_visible) through the real
+    _execute_step dispatch — not a third, parallel hand-rolled check.
+
+    Prefers url_matches against the crawl-observed post_login_url, the
+    strongest positive signal available — but ONLY when that URL actually
+    differs from login_url. For a single-page app (both identical), the URL
+    cannot discriminate anything: confirmed live against the bundled demo
+    fixture, url_matches(post_login_url) reported "authenticated" both
+    immediately after a real login AND immediately after a verified
+    logout, since the page never navigates anywhere else. Falls back to
+    "the username field the crawl found is not visible" — which does
+    discriminate for that same fixture — when post_login_url doesn't
+    genuinely differ, or isn't known at all.
+    """
+    locators = dict(discovery.locators)
+    login_url_norm = (discovery.login_url or "").split("?")[0].rstrip("/")
+    post_login_url_norm = (discovery.post_login_url or "").split("?")[0].rstrip("/")
+    if discovery.post_login_url and post_login_url_norm != login_url_norm:
+        probe = StepDef(0, "verify", "PostLogin", assertion="url_matches", expected=discovery.post_login_url)
+        ok, msg = _execute_step(probe, locators, "")
+        if ok:
+            return True, msg
+
+    user_loc = locators.get("username")
+    if user_loc and user_loc.get("by") and user_loc.get("value"):
+        probe = StepDef(
+            0,
+            "verify",
+            "Username",
+            locator_by=user_loc["by"],
+            locator_value=user_loc["value"],
+            assertion="element_visible",
+            expected="username",
+        )
+        ok, msg = _execute_step(probe, locators, "")
+        if ok:
+            return False, f"still on the login page — {msg}"
+        return True, f"no login form — {msg}"
+
+    return False, "cannot confirm authentication — no post_login_url or username locator available from the crawl"
+
+
 def run_scenario(
     scenario: ScenarioDef,
     discovery: DiscoveryResult,
@@ -483,9 +557,136 @@ def run_scenario(
 
     step_context: dict = {"vars": {}, "logger": logger, "terminate": False}
 
-    steps_results = []
+    steps_results: list = []
     total_steps = len(scenario.steps)
-    for step in scenario.steps:
+    steps_to_run = scenario.steps
+
+    # Idempotent login (D9): the harness no longer logs in on the caller's
+    # behalf (see run_all_automation) — every scenario embeds its own login
+    # steps and is responsible for its own auth. A credentialed run starts
+    # logged out (harness did that) and logs in for real here. An
+    # interactive/customer-session run may already be authenticated when
+    # this scenario starts; re-running the embedded login steps against an
+    # already-authenticated app finds no login form and fails for the wrong
+    # reason (this is what actually produced the OrangeHRM 0/9 — not a
+    # broken logout). A pure login scenario (TC_AUTO_01) is exempt — its
+    # whole job is to perform login, so it always runs for real.
+    if not _is_login_scenario(scenario):
+        login_prefix_end = _login_step_prefix_end(scenario.steps)
+
+        if login_prefix_end == 0:
+            # No embedded login steps in this scenario at all — it assumes
+            # it's already authenticated. Don't proceed on that assumption
+            # unverified (E1's disease again): check it for real.
+            authenticated, detail = _check_auth_state(discovery)
+            if not authenticated:
+                logger.fail(f"{scenario.id}: no login steps in this scenario, and the app is not authenticated — {detail}")
+                ended = datetime.now()
+                return TestResult(
+                    tc_id=scenario.id,
+                    title=scenario.title,
+                    test_type="automation",
+                    status="FAIL",
+                    steps=[],
+                    started_at=started.isoformat(timespec="seconds"),
+                    ended_at=ended.isoformat(timespec="seconds"),
+                    duration_ms=round((ended - started).total_seconds() * 1000, 2),
+                    error=f"No login steps in this scenario and the app is not authenticated — {detail}",
+                )
+        else:
+            login_steps = scenario.steps[:login_prefix_end]
+            rest_steps = scenario.steps[login_prefix_end:]
+            authenticated, detail = _check_auth_state(discovery)
+
+            if authenticated:
+                logger.info(f"{scenario.id}: already authenticated — {detail} — login steps satisfied, not re-run")
+                for step in login_steps:
+                    steps_results.append(
+                        run_step(
+                            logger,
+                            step.step_no,
+                            step.action,
+                            step.object_name,
+                            step.input_value,
+                            (lambda d=detail: (True, f"Already authenticated — {d}")),
+                            tc_id=scenario.id,
+                            tc_title=scenario.title,
+                            total_steps=total_steps,
+                        )
+                    )
+                steps_to_run = rest_steps
+            else:
+                # Not authenticated — run the embedded login steps for real
+                # (falls through to the loop below via steps_to_run), then
+                # confirm they actually worked before trusting the rest of
+                # the scenario to a state nothing verified.
+                for step in login_steps:
+                    if step.locator_by and step.locator_value:
+                        register_step_locator(step.object_name, step.locator_by, step.locator_value)
+
+                    def make_login_exec(s=step, ctx=step_context):
+                        def _run():
+                            return _execute_step(s, locators, password, ctx)
+
+                        return _run
+
+                    steps_results.append(
+                        run_step(
+                            logger,
+                            step.step_no,
+                            step.action,
+                            step.object_name,
+                            step.input_value,
+                            make_login_exec(),
+                            tc_id=scenario.id,
+                            tc_title=scenario.title,
+                            total_steps=total_steps,
+                        )
+                    )
+
+                now_authenticated, confirm_detail = _check_auth_state(discovery)
+                confirm_step_no = (login_steps[-1].step_no if login_steps else 0) + 1
+                steps_results.append(
+                    run_step(
+                        logger,
+                        confirm_step_no,
+                        "Verify",
+                        "Authenticated",
+                        "",
+                        (
+                            lambda: (
+                                now_authenticated,
+                                (
+                                    f"Login confirmed — {confirm_detail}"
+                                    if now_authenticated
+                                    else f"Ran login steps but authentication could not be confirmed — {confirm_detail}"
+                                ),
+                            )
+                        ),
+                        tc_id=scenario.id,
+                        tc_title=scenario.title,
+                        total_steps=total_steps,
+                    )
+                )
+
+                if not now_authenticated:
+                    ended = datetime.now()
+                    failed_login_steps = [s for s in steps_results if s.status == "FAIL"]
+                    return TestResult(
+                        tc_id=scenario.id,
+                        title=scenario.title,
+                        test_type="automation",
+                        status="FAIL",
+                        steps=steps_results,
+                        started_at=started.isoformat(timespec="seconds"),
+                        ended_at=ended.isoformat(timespec="seconds"),
+                        duration_ms=round((ended - started).total_seconds() * 1000, 2),
+                        error=failed_login_steps[0].message if failed_login_steps else confirm_detail,
+                    )
+
+                steps_to_run = rest_steps
+
+    for step in steps_to_run:
         try:
             from uts_engine.job_control import raise_if_stopped
 
@@ -562,7 +763,7 @@ def run_all_automation(
     run_modules_only: list[str] | None = None,
     run_test_cases_only: list[str] | None = None,
 ) -> list[TestResult]:
-    from uts_engine.automation.session_reset import prepare_fresh_session, teardown_after_test
+    from uts_engine.automation.session_reset import logout_and_reset, teardown_after_test
 
     results = []
     auto_scenarios = [s for s in discovery.scenarios if s.type in AUTOMATION_TYPES]
@@ -606,12 +807,23 @@ def run_all_automation(
 
         needs_fresh_login = scenario.id != "TC_AUTO_01" and not _is_login_scenario(scenario)
         if needs_fresh_login and logout_after_each:
-            if not prepare_fresh_session(discovery, password, logger, role_hint=role_hint):
-                # Logout could not be confirmed, or the re-login failed. Do
-                # NOT run this scenario as though it started clean — that is
-                # exactly the failure mode D8 exists to catch (E1/E3's
-                # disease: a check that silently passes because nobody
-                # verified the precondition it depends on).
+            # D9: the harness establishes a LOGGED-OUT state only — it does
+            # NOT authenticate. Authentication is owned by the scenario's
+            # own embedded login steps (see run_scenario's idempotent-login
+            # handling): a credentialed run logs itself back in there; an
+            # interactive run with no credentials skips login it cannot
+            # perform and reuses the live session instead. Do NOT re-add a
+            # login call here — calling both this and the scenario's own
+            # login is the exact double-login collision that produced
+            # OrangeHRM's 0/9 (the harness logged in, then the scenario's
+            # own steps tried to log in again against an already-
+            # authenticated app and found no login form).
+            if not logout_and_reset(discovery.login_url, logger, locators=discovery.locators):
+                # Logout could not be confirmed. Do NOT run this scenario as
+                # though it started clean — that is exactly the failure mode
+                # D8 exists to catch (E1/E3's disease: a check that silently
+                # passes because nobody verified the precondition it
+                # depends on).
                 logger.fail(f"{scenario.id}: session reset could not be confirmed — skipping")
                 results.append(
                     TestResult(
@@ -619,7 +831,7 @@ def run_all_automation(
                         title=scenario.title,
                         test_type="automation",
                         status="FAIL",
-                        error="Session reset could not be confirmed (logout/re-login not verified) before this scenario started",
+                        error="Session reset could not be confirmed (logout not verified) before this scenario started",
                         started_at=datetime.now().isoformat(timespec="seconds"),
                         ended_at=datetime.now().isoformat(timespec="seconds"),
                     )
@@ -649,14 +861,17 @@ def run_all_automation(
                         logger.info("Automation stopped by user after failure — skipping retry")
                         break
                     raise
-                # Only re-login if we can actually log back in. On a session the
-                # customer supplied interactively there are no credentials, so a
-                # "fresh session" here signs us out for good and every later
-                # scenario runs against the login page.
+                # Only log out if we can actually get back in afterward. On a
+                # session the customer supplied interactively there are no
+                # credentials, so logging out here signs us out for good and
+                # every later scenario runs against the login page. D9: this
+                # is logout only, never login — the retried scenario's own
+                # embedded login steps own re-authenticating, same as the
+                # pre-scenario call above.
                 skip_retry = False
                 if logout_after_each:
-                    logger.info(f"{scenario.id} failed — fresh login and retry explore scenario once")
-                    if not prepare_fresh_session(discovery, password, logger, role_hint=role_hint):
+                    logger.info(f"{scenario.id} failed — logging out and retrying once")
+                    if not logout_and_reset(discovery.login_url, logger, locators=discovery.locators):
                         logger.fail(f"{scenario.id}: session reset could not be confirmed before retry — skipping retry")
                         skip_retry = True
                 else:

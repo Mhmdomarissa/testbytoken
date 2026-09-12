@@ -116,3 +116,44 @@ locator doesn't resolve, instead of silently giving up.
 target from producing meaningful case-level pass/fail data — every test
 case after the first is currently testing "did the previous test case's
 session survive," not the scenario it claims to.
+
+---
+
+## D10. `_find_element()` can click an element that exists but isn't actually shown
+
+**Where:** `services/engine/uts_engine/discovery/automation_runner.py`,
+`_find_element()`'s locator-based lookup: after checking for a *visible*
+match, it explicitly falls back to `driver.find_elements(by, value)` and
+returns the first result "even if not displayed" — the comment there says
+this is deliberate, for mega-menus / off-canvas navigation.
+
+**Found while:** diagnosing why D9's idempotent-login logic appeared to
+work against the local fixture (3/3 passed) even in a build that had
+`_check_auth_state()`'s SPA bug (see this file's note on that fix)
+misreporting "authenticated" immediately after a *verified* logout.
+Directly reproduced: with the fixture genuinely on the login screen
+(confirmed via `document.getElementById('screen-dashboard')`'s active
+class), calling `_find_element()` on the dashboard's "Transfers" nav
+link — which is inside a `display:none` container at that point — still
+returned the element, and clicking it reported `PASS`.
+
+**Problem.** This fallback can't distinguish "hidden because a menu
+hasn't been opened yet" (the case it's meant for) from "hidden because
+the app genuinely isn't in the state this step assumes" (session expired,
+wrong page, not authenticated). It let a click silently "succeed" against
+an element that was not actually interactable in the state the app was
+actually in — the same shape of problem W2 (E2) already fixed for the
+any-*locator* sweep, just one layer down: this is the any-*visibility*
+sweep for a single, correctly-identified locator.
+
+**Why this wasn't fixed here.** Out of scope for D9, which is about the
+login-step orchestration, not the general element-resolution fallback
+chain — and this fallback has a documented, intentional reason to exist
+(real mega-menu/off-canvas UIs where an element is legitimately in the
+DOM but not yet visible pending an unrelated trigger). Narrowing it
+correctly needs a real design decision (e.g., only fall back to a hidden
+match when the step itself is inside a known "open this first" sequence),
+not a quick removal — removing it outright would likely just break the
+apps it was added for.
+
+**Status:** open, unowned.
