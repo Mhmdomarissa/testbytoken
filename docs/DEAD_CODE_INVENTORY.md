@@ -61,3 +61,58 @@ merged into `ai_brain.py`'s, or retired outright, rather than maintaining
 both independently going forward.
 
 **Status:** open, unowned.
+
+---
+
+## D8. Cross-test logout never actually works against any app but the bundled fixture
+
+**Where:** `services/engine/uts_engine/automation/session_reset.py:64` reads
+`logout_button` from `services/engine/config/selenium.json:44`, which is
+hardcoded to `{"by": "id", "value": "btn-logout"}` — the bundled local
+demo fixture's own logout control id, not anything crawl-derived.
+
+**Found while:** producing the final W0a-vs-Phase-0 OrangeHRM Admin
+before/after (the headline demo artifact). The honest run reported 0/9
+test cases passing, all landing on `'Username' not found — tried locator
+name=username`.
+
+**Problem.** Against any real app — OrangeHRM included — this locator
+never matches anything. `session_reset.py`'s "log out between test cases"
+step silently fails every time (caught, logged as "logout control not
+used"), so the browser's session cookie is never actually cleared. Every
+test case after the first one in a multi-case run starts already
+authenticated: `Navigate` to the login URL lands on `/dashboard/index`
+instead (OrangeHRM itself redirects an authenticated session away from
+the login page), and the SetText Username / SetPassword / PerformClick
+Login steps that follow find no login form to act on.
+
+**Why this was invisible until now.** Two Phase-0-fixed defects were
+stacked on top of it, each independently hiding it:
+  - E2 (the any-locator sweep, W2): with no login form present,
+    `_find_element`'s old fallback silently bound "SetText Username" and
+    "PerformClick Login" to *some other* visible element on the dashboard
+    and reported success. Confirmed by re-reading the **original** W0a
+    baseline's own raw data: 6 of its 7 test cases' Navigate step already
+    landed on `/dashboard/index`, not the login page — same defect, same
+    run — yet every one of those steps reported PASS.
+  - E1+E3 (vacuous assertions): the login-success Verify checked for the
+    string "OrangeHRM" or "Admin", both present on literally every page
+    of the app regardless of auth state, so even a step that ran against
+    the wrong page still verified "true."
+
+With both fixed, this stops being invisible and starts being nine FAILs.
+That is the correct, intended behavior of the assertion/locator work —
+this item is about the underlying defect the honesty work exposed, not
+about the runner being wrong.
+
+**Fix (future).** `logout_button` needs to come from what the crawl
+observed for *this* app (the same treatment D2 already gave field/button/
+search-box locators in the page map), not a static fixture-shaped config
+file — or `session_reset.py` needs a crawl-derived fallback (e.g. search
+observed buttons/links for logout-shaped text) when the configured
+locator doesn't resolve, instead of silently giving up.
+
+**Status:** open, unowned. Blocks any multi-test-case run against a real
+target from producing meaningful case-level pass/fail data — every test
+case after the first is currently testing "did the previous test case's
+session survive," not the scenario it claims to.
