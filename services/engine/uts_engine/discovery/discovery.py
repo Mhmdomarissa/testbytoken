@@ -43,6 +43,11 @@ class StepDef:
     locator_by: str = ""
     locator_value: str = ""
     expected: str = ""
+    # Closed assertion vocabulary for `verify` steps (E3): url_matches,
+    # element_visible, text_in_region, row_count. `expected` carries the
+    # argument; empty/unknown here means the step is never checkable and
+    # a verify always FAILs rather than assuming a soft pass.
+    assertion: str = ""
 
 
 @dataclass

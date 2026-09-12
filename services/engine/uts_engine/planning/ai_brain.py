@@ -211,18 +211,23 @@ def _login_steps(
     has_form = bool(user_loc or pass_loc or login_loc)
 
     if not has_form and not has_creds:
-        steps.append(
-            {
-                "step_no": 2,
-                "action": "Verify",
-                "object_name": "Home",
-                "input_value": _observed_marker(discovery) or url,
-                "locator_by": "",
-                "locator_value": "",
-                "expected": "Application opened",
-                "concept": "verification",
-            }
-        )
+        # No form to log into — the only thing the crawl observed to check is
+        # that we actually landed on the target URL rather than an error page
+        # or a redirect elsewhere.
+        if url:
+            steps.append(
+                {
+                    "step_no": 2,
+                    "action": "Verify",
+                    "object_name": "Home",
+                    "input_value": "",
+                    "locator_by": "",
+                    "locator_value": "",
+                    "expected": url,
+                    "assertion": "url_matches",
+                    "concept": "verification",
+                }
+            )
         return steps
 
     n = 2
@@ -268,35 +273,53 @@ def _login_steps(
             }
         )
         n += 1
-    steps.append(
-        {
-            "step_no": n,
-            "action": "Verify",
-            "object_name": "PostLogin",
-            "input_value": _observed_marker(discovery) or "Dashboard",
-            "locator_by": "",
-            "locator_value": "",
-            "expected": "Logged in successfully" if (has_creds or has_form) else "Application opened",
-            "concept": "verification",
-        }
-    )
+    post_login_step = _post_login_verify_step(discovery, url, step_no=n)
+    if post_login_step is not None:
+        steps.append(post_login_step)
     return steps
 
 
-def _observed_marker(discovery: dict) -> str:
-    """Something the crawl actually saw, for home / post-login verification.
+def _post_login_verify_step(discovery: dict[str, Any], login_url: str, step_no: int) -> dict[str, Any] | None:
+    """Build a post-login Verify only from what the crawl actually observed.
 
-    Never ``app_name``: that is the label the customer typed into our form. Almost
-    no application prints it back, so asserting on it manufactures failures — it
-    is what turned a run whose every real step passed into a FAIL.
+    Preferred: element_visible on the first observed module's own nav locator
+    — that element only exists in the authenticated shell. Fallback:
+    url_matches, but only if the URL genuinely changed after login (an SPA
+    that never changes URL gives us nothing honest to check there). If
+    neither is available, emit no step — a navigation-only scenario is more
+    honest than an invented expectation.
     """
-    title = str(discovery.get("page_title") or "").strip()
-    if title:
-        return title
-    from urllib.parse import urlsplit
+    modules = discovery.get("modules") or []
+    first = next((m for m in modules if isinstance(m, dict) and m.get("locator")), None)
+    if first is not None:
+        loc = first["locator"] or {}
+        if loc.get("by") and loc.get("value"):
+            return {
+                "step_no": step_no,
+                "action": "Verify",
+                "object_name": "PostLogin",
+                "input_value": "",
+                "locator_by": loc["by"],
+                "locator_value": loc["value"],
+                "expected": first.get("name", ""),
+                "assertion": "element_visible",
+                "concept": "verification",
+            }
 
-    target = str(discovery.get("post_login_url") or discovery.get("url") or "")
-    return urlsplit(target).netloc
+    post_login_url = str(discovery.get("post_login_url") or "")
+    if post_login_url and post_login_url != login_url:
+        return {
+            "step_no": step_no,
+            "action": "Verify",
+            "object_name": "PostLogin",
+            "input_value": "",
+            "locator_by": "",
+            "locator_value": "",
+            "expected": post_login_url,
+            "assertion": "url_matches",
+            "concept": "verification",
+        }
+    return None
 
 
 def _module_link_xpath(module: str) -> str:
@@ -354,18 +377,24 @@ def _module_flow_scenarios(
         }
     )
     n += 1
-    nav_steps.append(
-        {
-            "step_no": n,
-            "action": "Verify",
-            "object_name": f"{module} Page",
-            "input_value": module,
-            "locator_by": "",
-            "locator_value": "",
-            "expected": f"{module} page visible",
-            "concept": "verification",
-        }
-    )
+    page_url = str(page.get("url") or "")
+    if page_url:
+        # url_matches on the URL the crawl actually recorded for this page —
+        # not an invented "page visible" expectation.
+        nav_steps.append(
+            {
+                "step_no": n,
+                "action": "Verify",
+                "object_name": f"{module} Page",
+                "input_value": "",
+                "locator_by": "",
+                "locator_value": "",
+                "expected": page_url,
+                "assertion": "url_matches",
+                "concept": "verification",
+            }
+        )
+        n += 1
     scenarios.append(
         {
             "id": f"TC_AI_LINK_{slug}",
@@ -459,15 +488,18 @@ def _module_flow_scenarios(
             n += 1
         # A success toast only means something if we actually submitted.
         if save_btn and cfg.get("include_verification", True):
+            # No locator here on purpose — no single CSS class for a toast is
+            # true across apps. The runner falls back to the generic
+            # [role='alert'] ARIA pattern when a step carries none.
             fill_steps.append(
                 {
                     "step_no": n,
                     "action": "Notification",
                     "object_name": "Success",
-                    "input_value": "success",
-                    "locator_by": "css",
-                    "locator_value": ".oxd-toast, [role='alert'], .toast",
-                    "expected": "Record saved",
+                    "input_value": "",
+                    "locator_by": "",
+                    "locator_value": "",
+                    "expected": "success",
                     "concept": "verification",
                 }
             )
@@ -541,18 +573,11 @@ def _module_flow_scenarios(
             }
         )
         n += 1
-        neg_steps.append(
-            {
-                "step_no": n,
-                "action": "Verify",
-                "object_name": "Validation",
-                "input_value": "Required",
-                "locator_by": "",
-                "locator_value": "",
-                "expected": "Validation error shown for empty required fields",
-                "concept": "verification",
-            }
-        )
+        # No Verify here on purpose: the crawl does not observe a validation-
+        # message locator, so there is nothing checkable to assert on yet
+        # (would need the page-map locator capture from W5). This scenario
+        # stays a click-only smoke test — it proves empty-submit doesn't
+        # crash the app, and no more, until that locator exists.
         scenarios.append(
             {
                 "id": f"TC_AI_NEG_{slug}",
@@ -619,18 +644,12 @@ def _module_flow_scenarios(
                 }
             )
             n += 1
-        search_steps.append(
-            {
-                "step_no": n,
-                "action": "Verify",
-                "object_name": "Results",
-                "input_value": module,
-                "locator_by": "",
-                "locator_value": "",
-                "expected": "Search results displayed",
-                "concept": "verification",
-            }
-        )
+        # No Verify here on purpose: page_map's table_rows is a crawl-time
+        # count, not a re-queryable locator (row_count needs the step's own
+        # locator_by/locator_value — that capture is W5). This scenario stays
+        # search-only until then, rather than asserting on the module name
+        # appearing anywhere on the page (the exact vacuous-pass bug this
+        # phase exists to fix).
         scenarios.append(
             {
                 "id": f"TC_AI_SEARCH_{slug}",

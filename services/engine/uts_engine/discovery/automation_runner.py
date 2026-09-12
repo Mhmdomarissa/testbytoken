@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -191,6 +192,40 @@ def _find_element(step: StepDef, locators: dict[str, dict[str, str]], timeout: i
     return None
 
 
+def _resolve_named_locator(step: StepDef, locators: dict, name: str) -> tuple[str, str] | None:
+    """(by, value) for a verify-assertion target: the step's own locator first,
+    else a lookup by `name` in the locator repository the crawl built. Never
+    guesses or falls back to a literal CSS selector — callers must treat
+    None as "nothing configured to check" (E3: an assertion with nowhere to
+    look is not checkable, so it cannot pass)."""
+    if step.locator_by and step.locator_value:
+        return BY_MAP.get(step.locator_by, By.ID), step.locator_value
+    key = (name or "").strip()
+    loc = locators.get(key) or locators.get(key.lower()) or locators.get(key.lower().replace(" ", "_"))
+    if isinstance(loc, dict) and loc.get("value"):
+        return BY_MAP.get(loc.get("by", ""), By.ID), loc["value"]
+    return None
+
+
+_ROW_COUNT_RE = re.compile(r"^(>=|<=|>|<|=)?\s*(\d+)$")
+
+
+def _row_count_satisfies(count: int, spec: str) -> bool:
+    m = _ROW_COUNT_RE.match((spec or "").strip())
+    if not m:
+        return False
+    op, num = m.group(1) or "=", int(m.group(2))
+    if op == ">":
+        return count > num
+    if op == "<":
+        return count < num
+    if op == ">=":
+        return count >= num
+    if op == "<=":
+        return count <= num
+    return count == num
+
+
 def _is_critical_step(step: StepDef) -> bool:
     """Login/navigation/explicit clicks must not be silently skipped as PASS."""
     action = step.action.lower()
@@ -248,90 +283,101 @@ def _execute_step(
             return True, f"Opened {driver.current_url}"
 
         if action == "verify":
-            obj_lower = step.object_name.lower()
-            if obj_lower in ("post-login page", "logged-in page", "dashboard"):
-                left_login = driver.execute_script(
-                    "var e=document.getElementById('screen-login');"
-                    "return !e || !e.classList.contains('active');"
-                )
-                if left_login:
-                    return True, "Login successful — left login screen"
+            # Closed vocabulary (E3). No app-specific literal selectors
+            # (.oxd-toast, .oxd-table-body .oxd-table-row, #screen-login) —
+            # every locator here comes from the step itself or the crawl's
+            # locator repository. An unknown/empty assertion never passes.
+            kind = (step.assertion or "").strip().lower()
+            arg = (step.expected or step.input_value or "").strip()
+
+            if kind == "url_matches":
+                current = driver.current_url
+                if arg and arg in current:
+                    return True, f"URL '{current}' contains '{arg}'"
+                return _skip_or_fail(step, f"Expected URL to contain '{arg}'; current URL is {current}")
+
+            if kind == "element_visible":
+                target_name = arg or step.object_name
+                target = _resolve_named_locator(step, locators, target_name)
+                if target is None:
+                    return _skip_or_fail(
+                        step, f"No locator configured for element_visible check on '{target_name}'"
+                    )
+                by, value = target
                 try:
-                    pwd = driver.find_element(By.CSS_SELECTOR, "input[type='password']")
-                    if not pwd.is_displayed():
-                        return True, "Login successful — password field hidden"
+                    el = driver.find_element(by, value)
+                    if el.is_displayed():
+                        return True, f"Element '{target_name}' ({value}) is visible"
                 except Exception:  # noqa: BLE001
-                    return True, "Login successful — no password field"
-                login_url = locators.get("_login_url", "")
-                if login_url and driver.current_url != login_url:
-                    return True, f"URL changed to {driver.current_url}"
+                    pass
                 return _skip_or_fail(
                     step,
-                    "Expected to have left the login screen after signing in "
-                    f"(no password field, or a URL change from {login_url or '(unknown login url)'}); "
-                    f"still on {driver.current_url}",
+                    f"Expected element '{target_name}' ({value}) to be visible; not found or not displayed",
                 )
 
-            if "search result" in obj_lower:
-                rows = driver.find_elements(By.CSS_SELECTOR, ".oxd-table-body .oxd-table-row, table tbody tr")
-                if rows:
-                    return True, f"Search results visible ({len(rows)} row(s))"
-                page_text = driver.find_element(By.TAG_NAME, "body").text.lower()
-                if "no records" in page_text or "no data" in page_text:
-                    return True, "Search completed — no records found"
+            if kind == "text_in_region":
+                if "::" not in arg:
+                    return _skip_or_fail(
+                        step, f"text_in_region assertion malformed — need 'region::text', got '{arg}'"
+                    )
+                region_name, _, text = arg.partition("::")
+                region_name, text = region_name.strip(), text.strip()
+                target = _resolve_named_locator(step, locators, region_name)
+                if target is None:
+                    return _skip_or_fail(
+                        step, f"No locator configured for region '{region_name}' (text_in_region)"
+                    )
+                by, value = target
+                try:
+                    region_text = driver.find_element(by, value).text or ""
+                except Exception:  # noqa: BLE001
+                    return _skip_or_fail(
+                        step, f"Expected '{text}' inside region '{region_name}' ({value}); region not found"
+                    )
+                if text.lower() in region_text.lower():
+                    return True, f"'{text}' found inside region '{region_name}'"
                 return _skip_or_fail(
                     step,
-                    "Expected result rows (.oxd-table-body .oxd-table-row / table tbody tr) or a "
-                    "'no records'/'no data' message; page body contained neither",
+                    f"Expected '{text}' inside region '{region_name}' ({value}); "
+                    f"region text was \"{region_text.strip()[:120]}\"",
                 )
 
-            if "module complete" in obj_lower or "functional flow completed" in (step.expected or "").lower():
-                module_hint = (step.input_value or step.object_name or "").lower()
-                url = driver.current_url.lower()
-                body = driver.find_element(By.TAG_NAME, "body").text.lower()
-                if module_hint and module_hint in url:
-                    return True, f"Module '{step.input_value}' page active"
-                if module_hint and module_hint in body:
-                    return True, f"Module '{step.input_value}' content visible"
-                toasts = driver.find_elements(By.CSS_SELECTOR, ".oxd-toast, [role='alert']")
-                toast_text = " ".join((t.text or "") for t in toasts).lower()
-                if any(w in toast_text for w in ("success", "saved", "updated", "created")):
-                    return True, "Success notification shown"
+            if kind == "row_count":
+                if not (step.locator_by and step.locator_value):
+                    return _skip_or_fail(
+                        step,
+                        f"row_count needs the step's own row locator; none configured for '{step.object_name}'",
+                    )
+                by = BY_MAP.get(step.locator_by, By.ID)
+                count = len(driver.find_elements(by, step.locator_value))
+                if _row_count_satisfies(count, arg):
+                    return True, f"Row count {count} satisfies '{arg}' ({step.locator_by}={step.locator_value})"
                 return _skip_or_fail(
                     step,
-                    f"Expected '{module_hint or '(no module hint)'}' in the URL or page body, or a "
-                    f"success/saved/updated/created toast; found none of those on {driver.current_url}",
+                    f"Expected row count {arg!r} for {step.locator_by}={step.locator_value}; found {count}",
                 )
 
-            if step.input_value and step.input_value.startswith("http"):
-                return True, f"Current URL: {driver.current_url}"
-            headings = driver.find_elements(By.CSS_SELECTOR, "h1, h2, h6, .oxd-topbar-header-breadcrumb")
-            page_text = driver.title + " " + " ".join(h.text for h in headings if h.text)
-            expected = step.input_value or step.expected or step.object_name
-            if expected.lower() in page_text.lower():
-                return True, f"Verified '{expected}'"
-            # Soft verify for module pages: match URL/body tokens (e.g. About PMI)
-            hint = expected.replace(" Page", "").replace(" page", "").strip().lower()
-            url = driver.current_url.lower()
-            body = driver.find_element(By.TAG_NAME, "body").text.lower()
-            tokens = [t for t in hint.split() if len(t) > 2]
-            if tokens and all(t in url or t in body or t in page_text.lower() for t in tokens[:2]):
-                return True, f"Verified page context for '{expected}'"
-            if any(t in url for t in tokens):
-                return True, f"URL indicates '{expected}': {driver.current_url}"
             return _skip_or_fail(
                 step,
-                f"Expected '{expected}' in the page title/headings/URL/body; "
-                f"found title+headings=\"{page_text.strip()[:120]}\", url={driver.current_url}",
+                f"Verify step carried no checkable assertion (assertion={step.assertion!r}) "
+                f"— nothing was actually checked",
             )
 
         if action == "notification":
-            toast_selectors = ".oxd-toast, .oxd-toast-content, [role='alert'], .toast"
-            toasts = driver.find_elements(By.CSS_SELECTOR, toast_selectors)
-            toast_text = " ".join((t.text or "") for t in toasts if t.is_displayed())
-            expected = (step.input_value or step.expected or step.object_name or "success").lower()
-            combined = (toast_text + " " + driver.find_element(By.TAG_NAME, "body").text).lower()
-            if expected in combined or any(w in combined for w in ("success", "saved", "updated", "created")):
+            # object/locator name to find the toast/alert region — config or
+            # crawl-provided, else the generic ARIA role (not one app's CSS).
+            target = _resolve_named_locator(step, locators, step.object_name)
+            if target is not None:
+                by, value = target
+                toasts = [t for t in driver.find_elements(by, value) if t.is_displayed()]
+            else:
+                toasts = [t for t in driver.find_elements(By.CSS_SELECTOR, "[role='alert']") if t.is_displayed()]
+            toast_text = " ".join((t.text or "") for t in toasts)
+            expected = (step.expected or step.input_value or "").strip()
+            if not expected:
+                return _skip_or_fail(step, "Notification step carried no expected text to check")
+            body_text = driver.find_element(By.TAG_NAME, "body").text
+            if expected.lower() in (toast_text + " " + body_text).lower():
                 return True, f"Notification verified: {toast_text.strip() or expected}"
             return _skip_or_fail(
                 step,

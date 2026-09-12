@@ -38,6 +38,7 @@ def _step_from_dict(raw: dict[str, Any]) -> StepDef:
         locator_by=str(raw.get("locator_by") or ""),
         locator_value=str(raw.get("locator_value") or ""),
         expected=str(raw.get("expected") or ""),
+        assertion=str(raw.get("assertion") or ""),
     )
 
 
