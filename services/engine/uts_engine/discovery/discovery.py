@@ -8,12 +8,10 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Any
-from urllib.parse import urlparse
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 
 from uts_engine.discovery.login_helpers import (
@@ -632,16 +630,12 @@ def _collect_search_flow(
             except Exception:  # noqa: BLE001
                 pass
 
-    steps.append(
-        StepDef(
-            step_no,
-            "Verify",
-            "Search results",
-            "AutoTest",
-            expected="Search results or list updated",
-        )
-    )
-    step_no += 1
+    # No Verify here on purpose (D7): no result-row locator is captured by
+    # this crawl, so a row_count assertion has nothing real to re-query at
+    # run time, and "Search results or list updated" was never anything but
+    # an invented expectation. Search-only until table-row locator capture
+    # exists (D2 gave page_intelligence.py this for fields/buttons/search
+    # boxes, not table rows — a further, separate extension).
     return steps, step_no
 
 
@@ -809,6 +803,7 @@ def _build_negative_module_steps(
                 st.locator_by,
                 st.locator_value,
                 st.expected,
+                assertion=st.assertion,
             )
         )
         step_no += 1
@@ -849,15 +844,10 @@ def _build_negative_module_steps(
             )
         )
         step_no += 1
-        steps.append(
-            StepDef(
-                step_no,
-                "Verify",
-                "ValidationError",
-                "required",
-                expected="Validation or error message displayed",
-            )
-        )
+        # No Verify here on purpose (D7): no validation-message locator is
+        # captured by this crawl, so there is nothing checkable to assert on
+        # — this scenario stays a click-only smoke test (proves empty-submit
+        # doesn't crash the app) rather than asserting on invented text.
         return steps
 
     first_field = next(
@@ -877,15 +867,7 @@ def _build_negative_module_steps(
             )
         )
         step_no += 1
-        steps.append(
-            StepDef(
-                step_no,
-                "Verify",
-                "ValidationError",
-                "invalid",
-                expected="Validation or error message displayed",
-            )
-        )
+        # No Verify here either, same reason as the required-field path above.
     return steps
 
 
@@ -941,10 +923,22 @@ def _explore_module_page(
         except Exception:  # noqa: BLE001
             time.sleep(1)
 
-        headings = _find_headings(driver)
-        if headings:
+        # D7: url_matches against the URL we just actually landed on, not an
+        # invented "page visible" check — headings[0] alone has no locator
+        # to re-query at run time (_find_headings returns text only), so it
+        # can't back a text_in_region assertion either. The URL is real,
+        # crawl-observed data available right here.
+        module_url = driver.current_url
+        if module_url:
             steps.append(
-                StepDef(step_no, "Verify", "Page heading", headings[0], expected=headings[0])
+                StepDef(
+                    step_no,
+                    "Verify",
+                    f"{link_text} Page",
+                    "",
+                    assertion="url_matches",
+                    expected=module_url,
+                )
             )
             step_no += 1
 
@@ -1018,15 +1012,12 @@ def _explore_module_page(
             except Exception:  # noqa: BLE001
                 continue
 
-        steps.append(
-            StepDef(
-                step_no,
-                "Verify",
-                f"{link_text} module complete",
-                link_text,
-                expected=f"{link_text} functional flow completed",
-            )
-        )
+        # No closing Verify here on purpose (D7): checking whether link_text
+        # (e.g. "Admin") appears anywhere on the page is exactly the vacuous
+        # pattern this whole phase exists to remove — link_text is also the
+        # logged-in username shown in the page header on every page. The
+        # url_matches check earlier in this function already confirms we
+        # reached the module; nothing new is observed here to check against.
     except Exception as exc:  # noqa: BLE001
         print(f"    WARN: Module exploration error for '{link_text}': {exc}")
         if not steps:
@@ -1035,6 +1026,34 @@ def _explore_module_page(
             )
 
     return steps
+
+
+def _with_login(login_base: list[StepDef], extra_steps: list[StepDef]) -> list[StepDef]:
+    """Every test case must include the full login flow.
+
+    Renumbers extra_steps to follow login_base and reconstructs each one —
+    module-level (not a discover_application() closure) specifically so this
+    is unit-testable: it silently dropped the assertion field for a long
+    time (D7) because its field list was written before that field existed
+    and nothing caught a StepDef copy helper falling out of sync with the
+    dataclass.
+    """
+    combined = list(login_base)
+    start = len(combined) + 1
+    for i, s in enumerate(extra_steps):
+        combined.append(
+            StepDef(
+                step_no=start + i,
+                action=s.action,
+                object_name=s.object_name,
+                input_value=s.input_value,
+                locator_by=s.locator_by,
+                locator_value=s.locator_value,
+                expected=s.expected,
+                assertion=s.assertion,
+            )
+        )
+    return combined
 
 
 def discover_application(
@@ -1083,7 +1102,10 @@ def discover_application(
         print("  No login form detected on this page — scanning without login (public site mode)")
         login_manual_steps = [
             StepDef(1, "Navigate", "Application URL", url, expected="Application page loads"),
-            StepDef(2, "Verify", "Landing page", "", expected="Page content is visible"),
+            # url_matches against the target URL itself (D7): confirms we
+            # landed on the intended page rather than an error/redirect,
+            # instead of the invented "Page content is visible".
+            StepDef(2, "Verify", "Landing page", "", assertion="url_matches", expected=url),
         ]
         login_auto_steps = list(login_manual_steps)
 
@@ -1200,10 +1222,11 @@ def discover_application(
             )
             login_auto_steps.append(login_manual_steps[-1])
             step_no += 1
-        login_manual_steps.append(
-            StepDef(step_no, "Verify", "Post-login page", "", expected="Dashboard or home visible")
-        )
-        login_auto_steps.append(login_manual_steps[-1])
+        # No Verify appended here on purpose (D7): post_login_url isn't known
+        # yet at this point in the flow (login hasn't happened), so there is
+        # nothing real to assert on. TC_AUTO_01 (which uses login_auto_steps)
+        # stays login-only for now; the actual post-login check lives further
+        # down in base_explore_extra, built after post_login_url is captured.
 
         # Perform login to discover post-login UI (username + role already set above)
         time.sleep(1)
@@ -1231,19 +1254,18 @@ def discover_application(
         wait.until(lambda d: len(_find_nav_links(d)) > 0)
     except Exception:  # noqa: BLE001
         pass  # genuinely empty app — fall through with zero modules
-    headings = _find_headings(driver)
     nav_links = _find_nav_links(driver)
     form_fields = _find_form_fields(driver)
 
+    # D7: url_matches against the real post_login_url, captured just above —
+    # not the invented heading check that used to follow it (headings[0] has
+    # no locator to re-query at run time).
     explore_manual: list[StepDef] = [
-        StepDef(1, "Verify", "Logged-in page", "", expected=f"URL: {post_login_url}"),
+        StepDef(1, "Verify", "Logged-in page", "", assertion="url_matches", expected=post_login_url),
     ]
     explore_auto: list[StepDef] = [
-        StepDef(1, "Verify", "Logged-in page", post_login_url, expected="URL changed after login"),
+        StepDef(1, "Verify", "Logged-in page", "", assertion="url_matches", expected=post_login_url),
     ]
-    if headings:
-        explore_manual.append(StepDef(2, "Verify", "Page heading", headings[0], expected=headings[0]))
-        explore_auto.append(StepDef(2, "Verify", "Page heading", headings[0], expected=headings[0]))
 
     step_idx = len(explore_manual) + 1
     for i, (link_text, el) in enumerate(nav_links[:3]):
@@ -1267,23 +1289,6 @@ def discover_application(
             )
             step_idx += 1
 
-    def _with_login(login_base: list[StepDef], extra_steps: list[StepDef]) -> list[StepDef]:
-        """Every test case must include the full login flow."""
-        combined = list(login_base)
-        start = len(combined) + 1
-        for i, s in enumerate(extra_steps):
-            combined.append(
-                StepDef(
-                    step_no=start + i,
-                    action=s.action,
-                    object_name=s.object_name,
-                    input_value=s.input_value,
-                    locator_by=s.locator_by,
-                    locator_value=s.locator_value,
-                    expected=s.expected,
-                )
-            )
-        return combined
 
     if automation_only:
         scenarios = [
@@ -1301,19 +1306,18 @@ def discover_application(
         ]
         auto_idx = 2
 
+        # D7: url_matches against post_login_url — real, captured earlier in
+        # this function — not the invented heading check that used to follow.
         base_explore_extra = [
             StepDef(
                 1,
                 "Verify",
                 "Logged-in page" if has_login_form else "Landing page",
-                post_login_url,
-                expected="URL changed after login" if has_login_form else "Page loaded",
+                "",
+                assertion="url_matches",
+                expected=post_login_url,
             ),
         ]
-        if headings:
-            base_explore_extra.append(
-                StepDef(2, "Verify", "Page heading", headings[0], expected=headings[0])
-            )
         scenarios.append(
             ScenarioDef(
                 f"TC_AUTO_{auto_idx:02d}",
