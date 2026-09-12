@@ -1,0 +1,13 @@
+{
+  "commit": "8e81a92",
+  "timestamp": "2026-09-12T14:52:31+00:00",
+  "test_cases": 3,
+  "steps_total": 30,
+  "steps_pass": 24,
+  "steps_fail": 6,
+  "steps_skip": 0,
+  "assertions_total": 8,
+  "assertions_with_kind": 2,
+  "steps_with_real_locator": 12,
+  "honest_pass_rate": 0.8
+}
