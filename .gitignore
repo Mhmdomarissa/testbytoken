@@ -27,3 +27,7 @@ reference/uts-platform/alm-output/
 reference/uts-platform/xpedite-output/
 reference/uts-platform/reports/
 reference/uts-platform/logs/
+
+# Personal, per-machine Claude Code permissions — .claude/launch.json stays
+# tracked (shared run config); this one is local-only.
+.claude/settings.local.json
