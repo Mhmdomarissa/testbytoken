@@ -1,0 +1,7 @@
+[tool.pytest.ini_options]
+# uts_engine/automation/test_login.py, test_navigation.py, test_transfer.py
+# are Selenium scenario scripts (need a real browser/session), not pytest
+# tests. Without this, a bare `pytest` run from services/engine/ collects
+# them too. testpaths keeps collection to the real test suite regardless
+# of how pytest is invoked or from where.
+testpaths = ["tests"]
