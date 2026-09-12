@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -73,6 +74,15 @@ def load_input() -> dict:
     if not INPUT_FILE.exists():
         raise FileNotFoundError(f"Create {INPUT_FILE} with url, username, password")
     data = json.loads(INPUT_FILE.read_text(encoding="utf-8-sig"))
+    # Env vars win over the file so a credential never has to be written to
+    # app-input.json on disk to run locally — the file stays the fallback for
+    # whoever still wants to edit it directly.
+    env_username = os.environ.get("UTS_APP_USERNAME")
+    env_password = os.environ.get("UTS_APP_PASSWORD")
+    if env_username:
+        data["username"] = env_username
+    if env_password:
+        data["password"] = env_password
     for field in ("url", "username", "password"):
         if not data.get(field):
             raise ValueError(f"app-input.json missing required field: {field}")

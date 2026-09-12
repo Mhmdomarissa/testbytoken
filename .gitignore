@@ -31,3 +31,8 @@ reference/uts-platform/logs/
 # Personal, per-machine Claude Code permissions — .claude/launch.json stays
 # tracked (shared run config); this one is local-only.
 .claude/settings.local.json
+
+# Per-machine engine target + credential fallback. Prefer UTS_APP_USERNAME /
+# UTS_APP_PASSWORD env vars instead of editing this file. Template lives at
+# services/engine/config/app-input.example.json — copy it to get started.
+services/engine/config/app-input.json
