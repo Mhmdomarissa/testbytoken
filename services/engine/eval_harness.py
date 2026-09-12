@@ -6,6 +6,20 @@ checkable assertion, and how many steps ran against a real, crawl-observed
 locator rather than none at all. Reads the two artifacts an engine-run
 already writes — no new run mode, no extra instrumentation.
 
+Split by generator (ai_brain.py vs discovery.py's own generator — see
+_generator_of()) because a blended, whole-suite ratio is misleading once
+W5/D1 started merging both generators' scenarios into the same run:
+ai_brain.py is the one Phase 0 actually taught to emit real assertions
+(W3+W4); discovery.py's own generator was not touched (see D7 in
+docs/DEAD_CODE_INVENTORY.md) and its Verify steps still carry no assertion
+kind. A single blended percentage averages a fixed generator with a known-
+still-broken one and reports neither honestly.
+
+Also reports two distinct pass rates rather than one unitless number:
+case_pass_rate (test cases that passed outright) and step_pass_rate
+(individual steps that passed) — these do not have to agree, and printing
+only one invites reading it as the other.
+
 Reads:
     generated/discovered-flow.json  — step-level assertion/locator source
                                        of truth (StepDef, as actually run)
@@ -32,6 +46,21 @@ ENGINE_ROOT = Path(__file__).resolve().parent
 GENERATED_DIR = ENGINE_ROOT / "generated"
 REPORTS_DIR = ENGINE_ROOT / "reports"
 
+# ai_brain.py's generator (services/engine/uts_engine/planning/ai_brain.py)
+# prefixes every scenario id it emits with "TC_AI_" — every call site does,
+# with no exception (checked: _login_steps, _module_flow_scenarios and
+# offline_understand's other branches). discovery.py's own generator never
+# uses that prefix (TC_AUTO_*, TC_POS_*, TC_NEG_*, ...). This is a real,
+# consistently-followed convention in the current code, not incidental —
+# but it IS a naming-convention match, not a recorded field, so it silently
+# breaks if either generator's prefix ever changes. There is currently no
+# other signal in discovered-flow.json to classify a scenario's origin by.
+_AI_BRAIN_PREFIX = "TC_AI_"
+
+
+def _generator_of(tc_id: str) -> str:
+    return "ai_brain" if tc_id.startswith(_AI_BRAIN_PREFIX) else "discovery_generator"
+
 
 def _git_commit() -> str:
     try:
@@ -57,17 +86,22 @@ def _step_lookup(discovered_flow: dict) -> dict[tuple[str, int], dict]:
     return lookup
 
 
-def build_scorecard(results: dict, discovered_flow: dict, commit: str | None = None) -> dict:
-    step_lookup = _step_lookup(discovered_flow)
-    has_flow_data = bool(step_lookup)
+def _rate(numerator: int, denominator: int) -> float:
+    return round(numerator / denominator, 4) if denominator else 0.0
 
-    test_cases = results.get("automation") or []
+
+def _score_test_cases(test_cases: list[dict], step_lookup: dict[tuple[str, int], dict]) -> dict:
+    """Metrics for exactly the test cases passed in — the caller decides
+    which subset (all of them, or one generator's)."""
     steps_total = steps_pass = steps_fail = steps_skip = 0
     assertions_total = assertions_with_kind = 0
     steps_with_real_locator = 0
+    cases_passed = 0
 
     for tc in test_cases:
         tc_id = tc.get("tc_id", "")
+        if (tc.get("status") or "").upper() == "PASS":
+            cases_passed += 1
         for step in tc.get("steps") or []:
             steps_total += 1
             status = (step.get("status") or "").upper()
@@ -89,20 +123,39 @@ def build_scorecard(results: dict, discovered_flow: dict, commit: str | None = N
             if step_def and step_def.get("locator_by") and step_def.get("locator_value"):
                 steps_with_real_locator += 1
 
-    honest_pass_rate = round(steps_pass / steps_total, 4) if steps_total else 0.0
-
-    card = {
-        "commit": commit if commit is not None else _git_commit(),
-        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    return {
         "test_cases": len(test_cases),
+        "case_pass_rate": _rate(cases_passed, len(test_cases)),
         "steps_total": steps_total,
         "steps_pass": steps_pass,
         "steps_fail": steps_fail,
         "steps_skip": steps_skip,
+        "step_pass_rate": _rate(steps_pass, steps_total),
         "assertions_total": assertions_total,
         "assertions_with_kind": assertions_with_kind,
+        "assertion_kind_rate": _rate(assertions_with_kind, assertions_total),
         "steps_with_real_locator": steps_with_real_locator,
-        "honest_pass_rate": honest_pass_rate,
+        "locator_rate": _rate(steps_with_real_locator, steps_total),
+    }
+
+
+def build_scorecard(results: dict, discovered_flow: dict, commit: str | None = None) -> dict:
+    step_lookup = _step_lookup(discovered_flow)
+    has_flow_data = bool(step_lookup)
+
+    test_cases = results.get("automation") or []
+    by_generator_cases: dict[str, list[dict]] = {"ai_brain": [], "discovery_generator": []}
+    for tc in test_cases:
+        by_generator_cases[_generator_of(tc.get("tc_id", ""))].append(tc)
+
+    card = {
+        "commit": commit if commit is not None else _git_commit(),
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        **_score_test_cases(test_cases, step_lookup),
+        "by_generator": {
+            name: _score_test_cases(cases, step_lookup)
+            for name, cases in by_generator_cases.items()
+        },
     }
     if not has_flow_data:
         card["note"] = (

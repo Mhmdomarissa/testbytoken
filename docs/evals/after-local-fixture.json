@@ -1,13 +1,46 @@
 {
-  "commit": "8e81a92",
-  "timestamp": "2026-09-12T14:52:31+00:00",
+  "commit": "adba701",
+  "timestamp": "2026-09-12T15:26:25+00:00",
   "test_cases": 3,
+  "case_pass_rate": 0.3333,
   "steps_total": 30,
   "steps_pass": 24,
   "steps_fail": 6,
   "steps_skip": 0,
+  "step_pass_rate": 0.8,
   "assertions_total": 8,
   "assertions_with_kind": 2,
+  "assertion_kind_rate": 0.25,
   "steps_with_real_locator": 12,
-  "honest_pass_rate": 0.8
+  "locator_rate": 0.4,
+  "by_generator": {
+    "ai_brain": {
+      "test_cases": 1,
+      "case_pass_rate": 1.0,
+      "steps_total": 7,
+      "steps_pass": 7,
+      "steps_fail": 0,
+      "steps_skip": 0,
+      "step_pass_rate": 1.0,
+      "assertions_total": 2,
+      "assertions_with_kind": 2,
+      "assertion_kind_rate": 1.0,
+      "steps_with_real_locator": 4,
+      "locator_rate": 0.5714
+    },
+    "discovery_generator": {
+      "test_cases": 2,
+      "case_pass_rate": 0.0,
+      "steps_total": 23,
+      "steps_pass": 17,
+      "steps_fail": 6,
+      "steps_skip": 0,
+      "step_pass_rate": 0.7391,
+      "assertions_total": 6,
+      "assertions_with_kind": 0,
+      "assertion_kind_rate": 0.0,
+      "steps_with_real_locator": 8,
+      "locator_rate": 0.3478
+    }
+  }
 }

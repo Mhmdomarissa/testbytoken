@@ -1,13 +1,46 @@
 {
   "commit": "13b0070",
-  "timestamp": "2026-09-12T14:54:52+00:00",
+  "timestamp": "2026-09-12T15:23:11+00:00",
   "test_cases": 1,
+  "case_pass_rate": 1.0,
   "steps_total": 7,
   "steps_pass": 7,
   "steps_fail": 0,
   "steps_skip": 0,
+  "step_pass_rate": 1.0,
   "assertions_total": 2,
   "assertions_with_kind": 0,
+  "assertion_kind_rate": 0.0,
   "steps_with_real_locator": 3,
-  "honest_pass_rate": 1.0
+  "locator_rate": 0.4286,
+  "by_generator": {
+    "ai_brain": {
+      "test_cases": 1,
+      "case_pass_rate": 1.0,
+      "steps_total": 7,
+      "steps_pass": 7,
+      "steps_fail": 0,
+      "steps_skip": 0,
+      "step_pass_rate": 1.0,
+      "assertions_total": 2,
+      "assertions_with_kind": 0,
+      "assertion_kind_rate": 0.0,
+      "steps_with_real_locator": 3,
+      "locator_rate": 0.4286
+    },
+    "discovery_generator": {
+      "test_cases": 0,
+      "case_pass_rate": 0.0,
+      "steps_total": 0,
+      "steps_pass": 0,
+      "steps_fail": 0,
+      "steps_skip": 0,
+      "step_pass_rate": 0.0,
+      "assertions_total": 0,
+      "assertions_with_kind": 0,
+      "assertion_kind_rate": 0.0,
+      "steps_with_real_locator": 0,
+      "locator_rate": 0.0
+    }
+  }
 }
