@@ -157,3 +157,43 @@ not a quick removal — removing it outright would likely just break the
 apps it was added for.
 
 **Status:** open, unowned.
+
+---
+
+## D11. `_best_locator()`'s worst-case fallback isn't unique enough to find its own element
+
+**Where:** `services/engine/uts_engine/discovery/discovery.py`'s
+`_best_locator()` — when an element has no `id`, `name`, or text, it falls
+back to `css = tag; css += f"[{attr}='{val}']"` for the first of
+`("type", "class")` that has a value. For a bare `<input type="text">`
+with no class, that produces `input[type='text']` — a selector matching
+*every* such input on the page, not a unique one.
+
+**Found while:** accounting for the final OrangeHRM Admin re-run's
+remaining failures (see the D9 commit / this session's report). 5 of the
+8 non-network failures (`TC_NEG_03`, `TC_AI_ENTER_Admin_D1/D2/D3`,
+`TC_AI_SEARCH_Admin_D1`) were `SetText` steps on search/filter fields
+whose captured `locator_value` was literally `input[type='text']`, and
+`_find_element` correctly returned nothing resolvable for it (whatever it
+matched wasn't the intended, currently-visible field — plausibly because
+OrangeHRM's advanced-search fields for this page live behind a collapsed
+panel the crawl never opened, so nothing genuinely visible matched
+either).
+
+**Problem.** This is the field-capture analog of D5 (matches-anything
+XPath) and D10 (visibility blindness): a locator that's technically
+"found" but not actually specific to the element the step means. Correct
+behavior here — a real FAIL rather than a silent bind to the wrong input
+— already happened (W1/W2 hold), so this isn't a new *honesty* bug. It's
+a coverage gap: these five test cases have no way to pass on OrangeHRM
+until fields like this get a locator that actually identifies them.
+
+**Why this wasn't fixed here.** Two separate, non-trivial questions
+bundled together — whether `_best_locator()`'s last-resort fallback
+should try harder (nearby label text, DOM position, `data-*` attributes)
+and whether the crawl needs to expand collapsed search/filter panels
+before capturing fields — neither is a quick fix, and this batch was
+scoped to the login/session mechanism (D7/D8/D9), not field-locator
+quality.
+
+**Status:** open, unowned.

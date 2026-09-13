@@ -1,0 +1,46 @@
+{
+  "commit": "862ff26",
+  "timestamp": "2026-09-13T12:16:54+00:00",
+  "test_cases": 9,
+  "case_pass_rate": 0.1111,
+  "steps_total": 116,
+  "steps_pass": 80,
+  "steps_fail": 2,
+  "steps_skip": 34,
+  "step_pass_rate": 0.6897,
+  "assertions_total": 15,
+  "assertions_with_kind": 8,
+  "assertion_kind_rate": 0.5333,
+  "steps_with_real_locator": 87,
+  "locator_rate": 0.75,
+  "by_generator": {
+    "ai_brain": {
+      "test_cases": 7,
+      "case_pass_rate": 0.1429,
+      "steps_total": 50,
+      "steps_pass": 40,
+      "steps_fail": 0,
+      "steps_skip": 10,
+      "step_pass_rate": 0.8,
+      "assertions_total": 11,
+      "assertions_with_kind": 6,
+      "assertion_kind_rate": 0.5455,
+      "steps_with_real_locator": 39,
+      "locator_rate": 0.78
+    },
+    "discovery_generator": {
+      "test_cases": 2,
+      "case_pass_rate": 0.0,
+      "steps_total": 66,
+      "steps_pass": 40,
+      "steps_fail": 2,
+      "steps_skip": 24,
+      "step_pass_rate": 0.6061,
+      "assertions_total": 4,
+      "assertions_with_kind": 2,
+      "assertion_kind_rate": 0.5,
+      "steps_with_real_locator": 48,
+      "locator_rate": 0.7273
+    }
+  }
+}
